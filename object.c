@@ -1,6 +1,7 @@
 #include "functions.h"
 
 #define MAX_OBJECTS 256
+#define SCALE 100
 
 typedef enum 
 {
@@ -19,9 +20,10 @@ typedef struct
   i32 sx, sy;
   u8  type;
   u8  height;
-  u8  depth;
+  i16 depth;
   u8  moveDelta;
-  u8  moveSpeed;
+  u8  moveSpeedX;
+  u8  moveSpeedY;
   u8  moveState;
 
   u8  frameAnimation;
@@ -29,10 +31,11 @@ typedef struct
   u8  frameTicks;
   u8  frameCount;
   u8  frameRate;
-  i8  velocity;
-
-  u16 trackingObject;
   u8  trackingTimer;
+
+  i16 velocityX;
+  i16 velocityY;
+  u16 trackingObject;
 
   u32 bAnimationState     : 1;
   u32 bDirection          : 1;
@@ -46,8 +49,6 @@ typedef struct
 Object  sObjects[256];
 Object* sDrawOrder[256];
 
-u8      sGridSize[(64 * 16)];
-
 static void Object_PreTick(Object* object);
 static void Object_Tick(Object* object);
 static void Object_Draw(Object* object);
@@ -57,37 +58,6 @@ static void Object_SetMoveDelta(Object* object, u8 moveVector);
 static void Object_SetMoveAction(Object* object, u8 moveAction);
 static void Object_SetPosition(Object* object, i32 x, u8 depth);
 
-static inline u32 GetGridCoord(i32 x, u8 depth)
-{
-  x /= 10;
-
-  if (x >= 64)
-    x = 63;
-  else if (x < 0)
-    x = 0;
-  
-  if (depth < 0)
-    depth = 0;
-  else if (depth > 16)
-    depth = 16;
-
-  return x + (depth * 64);
-}
-
-static inline bool CheckDepth(i32 x, u8 depth)
-{
-  return sGridSize[GetGridCoord(x, depth)] == 0;
-}
-
-static inline u8 GetDepth(i32 x, u8 depth)
-{
-  return sGridSize[GetGridCoord(x, depth)];
-}
-
-static inline void MarkDepth(i32 x, u8 depth)
-{
-  sGridSize[GetGridCoord(x, depth)]++;
-}
 
 void Objects_Setup()
 {
@@ -125,11 +95,6 @@ void Objects_Destroy(u16 id)
 
 void Objects_PreTick()
 {
-  for (int i = 0; i < (64 * 16); i++)
-  {
-    sGridSize[i] = 0;
-  }
-
   for (int i = 0; i < MAX_OBJECTS; i++)
   {
     Object* object = &sObjects[i];
@@ -154,7 +119,6 @@ void Objects_Tick()
 
 void Objects_Draw()
 {
-
   for (int i = 0; i < MAX_OBJECTS; i++)
   {
     Object* object = &sObjects[i];
@@ -163,17 +127,6 @@ void Objects_Draw()
       Object_Draw(object);
     }
   }
-
-  for(int i=0;i < 64;i++)
-  {
-    for(int j=0;j < 16;j++)
-    {
-      int x = i * 10;
-      int y = SCREEN_TOP_EDGE + (j * 8);
-      Canvas_PrintF(x, y, &FONT_NEOSANS, 18, "%i", GetDepth(i * 10, 15 - j));
-    }
-  }
-
 }
 
 void Objects_SetPosition(u16 id, i32 x, u8 depth)
@@ -228,17 +181,28 @@ static void Object_Tick(Object* object)
   bool resetAnim  = false;
   bool movingAnim = false;
   
-  i8 velocity = object->velocity;
+  i16 velocityX = object->velocityX;
+  i16 velocityY = object->velocityY;
 
-  if (velocity > 0)
-    velocity -= DRAG;
-  else if (velocity < 0)
-    velocity += DRAG;
+  if (velocityX > 0)
+    velocityX -= 50;
+  else if (velocityX < 0)
+    velocityX += 50;
 
-  if (velocity < -4)
-    velocity = -4;
-  else if (velocity > 4)
-    velocity =  4;
+  if (velocityX < -4 * SCALE)
+    velocityX = -400;
+  else if (velocityX > 4 * SCALE)
+    velocityX =  400;
+
+  if (velocityY > 0)
+    velocityY -= 50;
+  else if (velocityY < 0)
+    velocityY += 50;
+
+  if (velocityY < -4 * SCALE)
+    velocityY = -400;
+  else if (velocityY > 4 * SCALE)
+    velocityY = 400;
 
   if (object->trackingObject != 0)
   {
@@ -261,32 +225,21 @@ static void Object_Tick(Object* object)
 
         if (depthDiff > 2)
         {
-          if (CheckDepth(object->x, object->depth - 1))
-          {
             object->moveDelta |= MV_Down;
-          }
+
         }
         else if (depthDiff < 2)
         {
-          if (CheckDepth(object->x, object->depth + 1))
-          {
             object->moveDelta |= MV_Up;
-          }
         }
 
         if (object->x < other->x)
         {
-          if (CheckDepth(object->x + 11, object->depth))
-          {
             object->moveDelta |= MV_Right;
-          }
         }
         else if (object->x > other->x)
         {
-          if (CheckDepth(object->x - 11, object->depth))
-          {
             object->moveDelta |= MV_Left;
-          }
         }
 
       }
@@ -296,26 +249,24 @@ static void Object_Tick(Object* object)
 
   if ((object->moveDelta & MV_Left) != 0)
   {
-    velocity -= object->moveSpeed;
+    velocityX -= object->moveSpeedX;
     newDirection = DIR_Left;
   }
 
   if ((object->moveDelta & MV_Right) != 0)
   {
-    velocity += object->moveSpeed;
+    velocityX += object->moveSpeedX;
     newDirection = DIR_Right;
   }
 
   if ((object->moveDelta & MV_Up) != 0)
   {
-    if (object->depth < 32)
-      object->depth++;
+    velocityY += object->moveSpeedY;
   }
 
   if ((object->moveDelta & MV_Down) != 0)
   {
-    if (object->depth > 0)
-      object->depth--;
+    velocityY -= object->moveSpeedY;
   }
 
   object->bDirection = newDirection;
@@ -327,49 +278,49 @@ static void Object_Tick(Object* object)
   }
   else if (object->moveState == MS_Walk)
   {
-    if (velocity == 0 && object->velocity != 0)
+    if (velocityX == 0 && object->velocityX != 0 || 
+        velocityY == 0 && object->velocityY != 0)
     {
       // Stopped
       Object_ResetAnim(object, ANIM_Stand);
-      object->moveSpeed = 1;
     }
-    else if (velocity !=0 && object->velocity == 0)
+    else if (velocityX != 0 && object->velocityX == 0 || 
+             velocityY != 0 && object->velocityY == 0)
     {
       // Moving
       Object_ResetAnim(object, ANIM_Walk);
-      object->moveSpeed = 2;
     }
   }
   else if (object->moveState == MS_Hit)
   {
-
   }
   else if (object->moveState == MS_Block)
   {
-
   }
   else if (object->moveState == MS_Jump)
   {
-
   }
   else if (object->moveState == MS_Damaged)
   {
-
   }
   else if (object->moveState == MS_KO)
   {
-
   }
 
-  object->velocity  = velocity;
-  object->x += object->velocity;
   object->moveDelta = 0;
 
-  if (object->depth > 16)
-    object->depth = 16;
+  object->velocityX  = velocityX;
+  object->x += object->velocityX;
+  object->velocityY  = velocityY;
+  object->depth += object->velocityY;
+  
+  if (object->depth > 6400)
+    object->depth = 6400;
+  else if (object->depth < 0)
+    object->depth = 0;
 
-  object->sx = object->x;  // (For now doesn't include screen scrolling, clipping, etc.)
-  object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->depth * 8);
+  object->sx = object->x / SCALE;  // (For now doesn't include screen scrolling, clipping, etc.)
+  object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->depth / SCALE);
 
   switch(object->frameAnimationStyle)
   {
@@ -443,7 +394,7 @@ static void Object_PreTick(Object* object)
 {
   if (object->type == OT_Enemy)
   {
-    MarkDepth(object->x, object->depth);
+//    MarkDepth(object->x, object->depth);
   }
   else if (object->type == OT_Player)
   {
@@ -480,7 +431,8 @@ static void Object_Initialise(Object* object, u8 type)
   SDL_memset(object, 0, sizeof(Object));
   
   object->type = type;
-  object->moveSpeed = 1;
+  object->moveSpeedX = 100;
+  object->moveSpeedY = 100;
 }
 
 static void Object_Clear(Object* object)

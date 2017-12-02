@@ -32,6 +32,26 @@ inline Colour Make_RGB(u8 r, u8 g, u8 b)
   return c;
 }
 
+inline Rect Make_Rect(i32 x, i32 y, i32 w, i32 h)
+{
+  Rect r;
+  r.left = x;
+  r.top = y;
+  r.right = x + w;
+  r.bottom = y + h;
+  return r;
+}
+
+inline Rect Make_Rect2(i32 l, i32 t, i32 r, i32 b)
+{
+  Rect rect;
+  rect.left = l;
+  rect.top = t;
+  rect.right = r;
+  rect.bottom = b;
+  return rect;
+}
+
 void Init(Settings* settings)
 {
   Palette_Make(&settings->palette);
@@ -48,7 +68,7 @@ void Init(Settings* settings)
 
   PlayerPalette.count = 4;
   PlayerPalette.colours[0] = Make_RGB(0xFF, 0x00, 0xFF);
-  PlayerPalette.colours[1] = Make_RGB(0xa3, 0x37, 0x39);
+  PlayerPalette.colours[1] = Make_RGB(0x82, 0x2c, 0x2f);
   PlayerPalette.colours[2] = Make_RGB(0xb8, 0x3e, 0x40);
   PlayerPalette.colours[3] = Make_RGB(0xd0, 0x46, 0x48);
 
@@ -109,7 +129,8 @@ void Step()
     nextMovement = MV_Left;
   else if (Input_GetActionDown(CTRL_MOVE_RIGHT))
     nextMovement = MV_Right;
-  else if (Input_GetActionDown(CTRL_MOVE_UP))
+  
+  if (Input_GetActionDown(CTRL_MOVE_UP))
     nextMovement = MV_Up;
   else if (Input_GetActionDown(CTRL_MOVE_DOWN))
     nextMovement = MV_Down;
@@ -127,15 +148,48 @@ void Step()
   Rect rect;
   rect.left   = 0;
   rect.right  = SCREEN_WIDTH;
+  rect.top    = 0;
+  rect.bottom = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE;
+  Canvas_DrawFilledRectangle(19, rect);
+
+  rect.left   = 0;
+  rect.right  = SCREEN_WIDTH;
   rect.top    = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE;
   rect.bottom = SCREEN_HEIGHT;
-  Canvas_DrawFilledRectangle(5, rect);
+  Canvas_DrawFilledRectangle(19, rect);
 
-  rect.left = 0;
-  rect.right = SCREEN_WIDTH;
-  rect.top = 0;
-  rect.bottom = SCREEN_TOP_EDGE;
-  Canvas_DrawFilledRectangle(5, rect);
+  SDL_Rect roadSrc;
+  roadSrc.x = 0;
+  roadSrc.y = 16;
+  roadSrc.w = 320;
+  roadSrc.h = 64;
+
+  SDL_Rect roadDst;
+  roadDst.x = 0;
+  roadDst.y = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - 64;
+  roadDst.w = 320;
+  roadDst.h = 64;
+
+  Canvas_Splat3(&SPRITESHEET, &roadDst, &roadSrc);
+
+  SDL_Rect skySrc;
+  skySrc.x = 0;
+  skySrc.y = 80;
+  skySrc.w = 320;
+  skySrc.h = 144;
+
+  SDL_Rect skyDst;
+  skyDst.x = 0;
+  skyDst.y = 0;
+  skyDst.w = 320;
+  skyDst.h = 144;
+
+  Canvas_Splat3(&SPRITESHEET, &skyDst, &skySrc);
+
+  Canvas_DrawFilledRectangle(19, Make_Rect2(0, 40, 160, 144));
+  Canvas_DrawFilledRectangle(19, Make_Rect2(160, 80, 240, 144));
+  Canvas_DrawFilledRectangle(19, Make_Rect2(240, 60, 320, 144));
+
 
   if (nextMovement != 0)
   {
