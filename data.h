@@ -34,7 +34,7 @@ typedef enum
 
 typedef enum
 {
-  DIR_Left  = -1,
+  DIR_Left  =  0,
   DIR_Right =  1
 } DirectionType;
 

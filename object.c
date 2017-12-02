@@ -23,15 +23,18 @@ typedef struct
   u8  moveDelta;
   u8  moveSpeed;
   u8  moveState;
-  u8  animation;
+
+  u8  frameAnimation;
   u8  frameCurrent;
-  u8  animationStyle;
-  i8  animationState;
   u8  frameTicks;
   u8  frameCount;
   u8  frameRate;
-  i8  direction;
   i8  velocity;
+
+  u32 bAnimationState     : 1;
+  u32 bDirection          : 1;
+  u32 frameAnimationStyle : 2;
+
 } Object;
 
 Object  sObjects[256];
@@ -114,14 +117,17 @@ void Objects_SetMovementVector(u16 id, u8 movementVector)
 
 static void Object_ResetAnim(Object* object, u8 anim)
 {
-  object->animation = anim;
+  object->frameAnimation = anim;
   object->frameTicks = 0;
-  Animation_GetInfo(object->animation, &object->frameRate, &object->frameCount, &object->animationStyle);
+  u8 style = object->frameAnimationStyle;
+
+  Animation_GetInfo(object->frameAnimation, &object->frameRate, &object->frameCount, &style);
+  object->frameAnimationStyle = style;
 }
 
 static void Object_Tick(Object* object)
 {
-  i8 newDirection = object->direction;
+  u8 newDirection = object->bDirection;
   bool resetAnim  = false;
   bool movingAnim = false;
 
@@ -135,13 +141,13 @@ static void Object_Tick(Object* object)
   if ((object->moveDelta & MV_Left) != 0)
   {
     velocity -= object->moveSpeed;
-    newDirection = -1;
+    newDirection = DIR_Left;
   }
 
   if ((object->moveDelta & MV_Right) != 0)
   {
     velocity += object->moveSpeed;
-    newDirection = 1;
+    newDirection = DIR_Right;
   }
 
   if ((object->moveDelta & MV_Up) != 0)
@@ -156,12 +162,8 @@ static void Object_Tick(Object* object)
       object->depth--;
   }
 
-  if (newDirection != object->direction)
-  {
-    resetAnim = true;
-    object->direction = newDirection;
-  }
-
+  object->bDirection = newDirection;
+  
   if (object->moveState == MS_Walk)
   {
     if (velocity == 0 && object->velocity != 0)
@@ -214,7 +216,7 @@ static void Object_Tick(Object* object)
   object->sx = object->x;  // (For now doesn't include screen scrolling, clipping, etc.)
   object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->depth * 4);
 
-  switch(object->animationStyle)
+  switch(object->frameAnimationStyle)
   {
     case AS_Once:
     {
@@ -246,7 +248,7 @@ static void Object_Tick(Object* object)
     break;
     case AS_PingPong:
     {
-      if (object->animationState == 1)
+      if (object->bAnimationState == 1)
       {
         object->frameTicks++;
 
@@ -257,7 +259,7 @@ static void Object_Tick(Object* object)
 
           if (object->frameCurrent == object->frameCount)
           {
-            object->animationState = 0;
+            object->bAnimationState = 0;
           }
         }
       }
@@ -272,7 +274,7 @@ static void Object_Tick(Object* object)
 
           if (object->frameCurrent == object->frameCount)
           {
-            object->animationState = 1;
+            object->bAnimationState = 1;
           }
         }
       }
@@ -290,7 +292,7 @@ static void Object_SetMoveDelta(Object* object, u8 moveVector)
 
 static void Object_Draw(Object* object)
 {
-  Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->animation, object->frameCurrent, object->direction);
+  Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->frameAnimation, object->frameCurrent, object->bDirection);
 }
 
 static void Object_Initialise(Object* object, u8 type)
