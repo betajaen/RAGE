@@ -282,6 +282,9 @@ void  Bitmap_LoadPaletted(const char* name, Bitmap* outBitmap, u8 colourOffset);
 // Loads a bitmap and matches the palette to the canvas palette best it can.
 void  Bitmap_Load24(const char* name, Bitmap* outBitmap, u8 transparentR, u8 transparentG, u8 transparentB);
 
+// Loads a bitmap, and swaps the palette with the given one.
+void  Bitmap_Load24_PaletteSwap(const char* name, Bitmap* outBitmap, u8 transparentR, u8 transparentG, u8 transparentB,  Palette* src, Palette* dst);
+
 void  Sprite_Make(Sprite* inSprite, Bitmap* bitmap, u32 x, u32 y, u32 w, u32 h);
 
 Sprite* SpriteHandle_Get(SpriteHandle id);

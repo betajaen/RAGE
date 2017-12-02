@@ -11,6 +11,7 @@
 #define SCREEN_WIDTH  (RETRO_CANVAS_DEFAULT_WIDTH)
 #define SCREEN_HEIGHT (RETRO_CANVAS_DEFAULT_HEIGHT)
 #define SCREEN_BOTTOM_EDGE  (SCREEN_HEIGHT - 256)
+#define SCREEN_TOP_EDGE  128
 
 #define CHARACTER_FRAME_W (16 * 2)
 #define CHARACTER_FRAME_H (16 * 3)
@@ -22,6 +23,7 @@
 
 extern Font   FONT_NEOSANS;
 extern Bitmap SPRITESHEET;
+extern Bitmap ANIMATIONS[2];
 
 extern u32    COUNTER_FRAME;
 extern u32    COUNTER_SECOND;
@@ -30,6 +32,7 @@ typedef enum
 {
   OT_None,
   OT_Player,
+  OT_Enemy
 } ObjectType;
 
 typedef enum
@@ -48,8 +51,16 @@ typedef enum
 
 typedef enum
 {
+  MA_Hit    = 1,
+  MA_Crouch = 2,
+  MA_Guard  = 3
+} MovementAction;
+
+typedef enum
+{
   ANIM_Stand = 0,
-  ANIM_Walk  = 1
+  ANIM_Walk  = 1,
+  ANIM_Punch = 2,
 } AnimationType;
 
 typedef enum

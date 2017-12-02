@@ -11,5 +11,6 @@ ref
 bin/
 obj/
 _build/
+art/
 
 genie.exe

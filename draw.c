@@ -1,23 +1,25 @@
 #include "functions.h"
 
-static const u8 kAnimationLengths[] = {
-  1, // ANIM_Stand
-  5, // ANIM_Walk
+typedef struct {
+  u8  length;
+  u8  style;
+  u8  speed;
+  u16 x;
+  u16 y;
+} AnimationInfo;
+
+AnimationInfo kAnimationInfos[] = {
+// C  Style    Sp  X  Y
+  {1, AS_Once, 30, 0, 0},   // ANIM_Stand
+  {5, AS_Loop, 3,  64,0},   // ANIM_Walk
+  {2, AS_Once, 5,  0, 96},  // ANIM_Punch
+  {3, AS_Once, 5,  64,96},  // ANIM_Crouch
 };
 
-static const u8 kAnimationStyles[] = {
-  AS_Once,    // ANIM_Stand
-  AS_Loop     // ANIM_Walk
-};
 
-static const u8 kAnimationSpeeds[] = {
-  30,
-  5
-};
+static const u8 kAnimationCount = 4;
 
-static const u8 kAnimationCount = sizeof(kAnimationLengths);
-
-void Draw_Animation(i32 x, i32 y, u32 animation, u32 frame, i8 direction)
+void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction)
 {
   SDL_Rect src, dst;
   dst.x = x;
@@ -26,13 +28,16 @@ void Draw_Animation(i32 x, i32 y, u32 animation, u32 frame, i8 direction)
   if (animation >= kAnimationCount)
     animation = 0;
 
-  const u8 maxFrame = kAnimationLengths[animation];
+  const u8 maxFrame = kAnimationInfos[animation].length;
 
   if (frame >= maxFrame)
     frame %= maxFrame;
 
-  src.x = CHARACTER_FRAME_SPRITESHEET_ORIGIN_X + (CHARACTER_FRAME_W * frame);
-  src.y = CHARACTER_FRAME_SPRITESHEET_ORIGIN_Y + (CHARACTER_FRAME_H * animation);
+  const int animationX = kAnimationInfos[animation].x;
+  const int animationY = kAnimationInfos[animation].y;
+
+  src.x = animationX + (CHARACTER_FRAME_W * frame);
+  src.y = animationY;
   dst.w = CHARACTER_FRAME_W;
   dst.h = CHARACTER_FRAME_H;
   src.w = CHARACTER_FRAME_W;
@@ -40,17 +45,17 @@ void Draw_Animation(i32 x, i32 y, u32 animation, u32 frame, i8 direction)
 
   if (direction == 1)
   {
-    Canvas_Splat3(&SPRITESHEET, &dst, &src);
+    Canvas_Splat3(&ANIMATIONS[type - 1], &dst, &src);
   }
   else
   {
-    Canvas_SplatFlip(&SPRITESHEET, &dst, &src, SDL_FLIP_HORIZONTAL);
+    Canvas_SplatFlip(&ANIMATIONS[type - 1], &dst, &src, SDL_FLIP_HORIZONTAL);
   }
 }
 
 void Animation_GetInfo(u8 type, u8* speed, u8* frameCount, u8* animStyle)
 {
-  *frameCount = kAnimationLengths[type];
-  *animStyle = kAnimationStyles[type];
-  *speed = kAnimationSpeeds[type];
+  *frameCount = kAnimationInfos[type].length;
+  *animStyle  = kAnimationInfos[type].style;
+  *speed      = kAnimationInfos[type].speed;
 }
