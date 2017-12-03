@@ -16,15 +16,13 @@ typedef enum
 
 typedef struct
 {
-  i32 x, w;
   i32 sx, sy;
   u8  type;
   u8  height;
-  i16 depth;
-  u8  moveDelta;
   u8  moveSpeedX;
   u8  moveSpeedY;
   u8  moveState;
+  u8  moveFlags;
 
   u8  frameAnimation;
   u8  frameCurrent;
@@ -33,8 +31,13 @@ typedef struct
   u8  frameRate;
   u8  trackingTimer;
 
+  i32 x;
+  i32 y;
   i16 velocityX;
   i16 velocityY;
+  i16 accelerationX;
+  i16 accelerationY;
+
   u16 trackingObject;
 
   u32 bAnimationState     : 1;
@@ -56,7 +59,7 @@ static void Object_Initialise(Object* object, u8 type);
 static void Object_Clear(Object* object);
 static void Object_SetMoveDelta(Object* object, u8 moveVector);
 static void Object_SetMoveAction(Object* object, u8 moveAction);
-static void Object_SetPosition(Object* object, i32 x, u8 depth);
+static void Object_SetPosition(Object* object, i32 x, u8 y);
 
 
 void Objects_Setup()
@@ -129,11 +132,11 @@ void Objects_Draw()
   }
 }
 
-void Objects_SetPosition(u16 id, i32 x, u8 depth)
+void Objects_SetPosition(u16 id, i32 x, u8 y)
 {
   if (id != 0)
   {
-    Object_SetPosition(&sObjects[id - 1], x, depth);
+    Object_SetPosition(&sObjects[id - 1], x, y);
   }
 }
 
@@ -175,34 +178,31 @@ static void Object_ResetAnim(Object* object, u8 anim)
   object->frameAnimationStyle = style;
 }
 
-static void Object_Tick(Object* object)
+i32 SolveVelocity(i32 velocity, i32 acceleration, i32 drag, i32 maxVelocity)
 {
-  u8 newDirection = object->bDirection;
-  bool resetAnim  = false;
-  bool movingAnim = false;
-  
-  i16 velocityX = object->velocityX;
-  i16 velocityY = object->velocityY;
+  if (acceleration != 0)
+  {
+    velocity += acceleration;
+  }
+  else if (drag > 0)
+  {
+    if (velocity - drag > 0)
+      velocity -= drag;
+    else if (velocity + drag < 0)
+      velocity += drag;
+    else
+      velocity = 0;
+  }
 
-  if (velocityX > 0)
-    velocityX -= 50;
-  else if (velocityX < 0)
-    velocityX += 50;
+  if (velocity > maxVelocity)
+    velocity = maxVelocity;
+  else if (velocity < -maxVelocity)
+    velocity = -maxVelocity;
+  return velocity;
+}
 
-  if (velocityX < -4 * SCALE)
-    velocityX = -400;
-  else if (velocityX > 4 * SCALE)
-    velocityX =  400;
-
-  if (velocityY > 0)
-    velocityY -= 50;
-  else if (velocityY < 0)
-    velocityY += 50;
-
-  if (velocityY < -4 * SCALE)
-    velocityY = -400;
-  else if (velocityY > 4 * SCALE)
-    velocityY = 400;
+static void EnemyObject_Tick(Object* object)
+{
 
   if (object->trackingObject != 0)
   {
@@ -215,62 +215,135 @@ static void Object_Tick(Object* object)
       object->trackingTimer = 1 + rand() % 3;
 
       int distanceX = (other->x - object->x);
-      int distanceY = (other->depth - object->depth);
+      int distanceY = (other->y - object->y);
       int distanceSq = (distanceX * distanceX) + (distanceY * distanceY);
 
       if (distanceSq < (125 * 125))
       {
 
-        int depthDiff = (object->depth - other->depth);
+        int yDiff = (object->y - other->y);
 
-        if (depthDiff > 2)
+        if (yDiff > 2)
         {
-            object->moveDelta |= MV_Down;
+          object->moveFlags |= MV_Down;
 
         }
-        else if (depthDiff < 2)
+        else if (yDiff < 2)
         {
-            object->moveDelta |= MV_Up;
+          object->moveFlags |= MV_Up;
         }
 
         if (object->x < other->x)
         {
-            object->moveDelta |= MV_Right;
+          object->moveFlags |= MV_Right;
         }
         else if (object->x > other->x)
         {
-            object->moveDelta |= MV_Left;
+          object->moveFlags |= MV_Left;
         }
 
       }
-      
+
     }
   }
+}
 
-  if ((object->moveDelta & MV_Left) != 0)
+static void MoveFlags2Acceleration(Object* object)
+{
+
+  if ((object->moveFlags & MV_Left) != 0)
   {
-    velocityX -= object->moveSpeedX;
-    newDirection = DIR_Left;
+    object->accelerationX = -object->moveSpeedX;
   }
 
-  if ((object->moveDelta & MV_Right) != 0)
+  if ((object->moveFlags & MV_Right) != 0)
   {
-    velocityX += object->moveSpeedX;
-    newDirection = DIR_Right;
+    object->accelerationX = object->moveSpeedX;
   }
 
-  if ((object->moveDelta & MV_Up) != 0)
+  if ((object->moveFlags & MV_Up) != 0)
   {
-    velocityY += object->moveSpeedY;
+    object->accelerationY = object->moveSpeedY;
   }
 
-  if ((object->moveDelta & MV_Down) != 0)
+  if ((object->moveFlags & MV_Down) != 0)
   {
-    velocityY -= object->moveSpeedY;
+    object->accelerationY = -object->moveSpeedY;
+  }
+}
+
+static i32 ClampPosition(i32 position, i16* velocity, i32 min, i32 max)
+{
+  if (position < min)
+  { 
+    position = min;
+    *velocity = 0;
+  }
+  else if (position > max)
+  {
+    position = max;
+    *velocity = 0;
+  }
+  return position;
+}
+
+static inline bool IsMovingX(Object* object)
+{
+  return object->velocityX != 0;
+}
+
+static inline bool IsMovingY(Object* object)
+{
+  return object->velocityY != 0;
+}
+
+static inline bool IsMoving(Object* object)
+{
+  return IsMovingX(object) || IsMovingY(object);
+}
+
+static void Object_Tick(Object* object)
+{
+  u8 newDirection = object->bDirection;
+  bool resetAnim  = false;
+  bool movingAnim = false;
+  
+  i16 velocityX  = object->velocityX;
+  i16 velocityY  = object->velocityY;
+  i16 lastVelocityX = velocityX;
+  i16 lastVelocityY = velocityY;
+
+  bool wasMoving = IsMoving(object);
+
+  object->accelerationX = 0;
+  object->accelerationY = 0;
+
+  if (object->type == OT_Enemy)
+  {
+    EnemyObject_Tick(object);
   }
 
-  object->bDirection = newDirection;
+  MoveFlags2Acceleration(object);
+  
+  velocityX = SolveVelocity(velocityX, object->accelerationX, 50, 400);
+  object->velocityX = velocityX;
+  object->x += object->velocityX;
 
+  velocityY = SolveVelocity(velocityY, object->accelerationY, 50, 400);
+  object->velocityY = velocityY;
+  object->y += object->velocityY;
+  object->y = ClampPosition(object->y, &object->velocityY, 0, 6400);
+  velocityY = object->velocityY;
+
+  if (velocityX > 0)
+    object->bDirection = 1;
+  else if (velocityX < 0)
+    object->bDirection = 0;
+
+  object->moveFlags = 0;
+
+  object->sx = object->x / SCALE;  // (For now doesn't include screen scrolling, clipping, etc.)
+  object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->y / SCALE);
 
   if (object->bIsCrouched == MS_Crouch)
   {
@@ -278,17 +351,13 @@ static void Object_Tick(Object* object)
   }
   else if (object->moveState == MS_Walk)
   {
-    if (velocityX == 0 && object->velocityX != 0 || 
-        velocityY == 0 && object->velocityY != 0)
+    if (!wasMoving && IsMoving(object))
     {
-      // Stopped
-      Object_ResetAnim(object, ANIM_Stand);
-    }
-    else if (velocityX != 0 && object->velocityX == 0 || 
-             velocityY != 0 && object->velocityY == 0)
-    {
-      // Moving
       Object_ResetAnim(object, ANIM_Walk);
+    }
+    else if (wasMoving && !IsMoving(object))
+    {
+      Object_ResetAnim(object, ANIM_Stand);
     }
   }
   else if (object->moveState == MS_Hit)
@@ -306,21 +375,6 @@ static void Object_Tick(Object* object)
   else if (object->moveState == MS_KO)
   {
   }
-
-  object->moveDelta = 0;
-
-  object->velocityX  = velocityX;
-  object->x += object->velocityX;
-  object->velocityY  = velocityY;
-  object->depth += object->velocityY;
-  
-  if (object->depth > 6400)
-    object->depth = 6400;
-  else if (object->depth < 0)
-    object->depth = 0;
-
-  object->sx = object->x / SCALE;  // (For now doesn't include screen scrolling, clipping, etc.)
-  object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->depth / SCALE);
 
   switch(object->frameAnimationStyle)
   {
@@ -394,7 +448,7 @@ static void Object_PreTick(Object* object)
 {
   if (object->type == OT_Enemy)
   {
-//    MarkDepth(object->x, object->depth);
+//    MarkDepth(object->x, object->y);
   }
   else if (object->type == OT_Player)
   {
@@ -402,15 +456,15 @@ static void Object_PreTick(Object* object)
   }
 }
 
-static void Object_SetPosition(Object* object, i32 x, u8 depth)
+static void Object_SetPosition(Object* object, i32 x, u8 y)
 {
   object->x = x;
-  object->depth = depth;
+  object->y = y;
 }
 
 static void Object_SetMoveDelta(Object* object, u8 moveVector)
 {
-  object->moveDelta = moveVector;
+  object->moveFlags = moveVector;
 }
 
 static void Object_SetMoveAction(Object* object, u8 moveAction)
