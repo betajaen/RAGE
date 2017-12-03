@@ -4,7 +4,7 @@
 
 Font   FONT_NEOSANS;
 Bitmap SPRITESHEET;
-Bitmap ANIMATIONS[2];
+Bitmap ANIMATIONS[OT_COUNT];
 u32    COUNTER_FRAME;
 u32    COUNTER_SECOND;
 u16    PLAYER;
@@ -25,6 +25,7 @@ typedef enum
 Palette CharacterSrcPalette;
 Palette PlayerPalette;
 Palette EnemyPalette;
+Palette CorpsePalette;
 
 inline Colour Make_RGB(u8 r, u8 g, u8 b)
 {
@@ -59,7 +60,6 @@ void Init(Settings* settings)
   Palette_LoadFromBitmap("tile.png", &settings->palette);
   Bitmap_Load24("tile.png", &SPRITESHEET, 0xFF, 0x00, 0xFF);
 
-
   CharacterSrcPalette.count = 4;
   CharacterSrcPalette.colours[0] = Make_RGB(0xFF, 0x00, 0xFF);
   CharacterSrcPalette.colours[1] = Make_RGB(0xFF, 0x00, 0x00);
@@ -78,8 +78,15 @@ void Init(Settings* settings)
   EnemyPalette.colours[2] = Make_RGB(0xdc, 0xde, 0xe3);
   EnemyPalette.colours[3] = Make_RGB(0xf0, 0xf8, 0xf7);
 
+  CorpsePalette.count = 4;
+  CorpsePalette.colours[0] = Make_RGB(0xFF, 0x00, 0xFF);
+  CorpsePalette.colours[1] = Make_RGB(0x32, 0x32, 0x2e);
+  CorpsePalette.colours[2] = Make_RGB(0x46, 0x46, 0x48);
+  CorpsePalette.colours[3] = Make_RGB(0x4c, 0x4c, 0x4c);
+
   Bitmap_Load24_PaletteSwap("character.png", &ANIMATIONS[0], 0xFF, 0x00, 0xFF, &CharacterSrcPalette, &PlayerPalette);
   Bitmap_Load24_PaletteSwap("character.png", &ANIMATIONS[1], 0xFF, 0x00, 0xFF, &CharacterSrcPalette, &EnemyPalette);
+  Bitmap_Load24_PaletteSwap("character.png", &ANIMATIONS[2], 0xFF, 0x00, 0xFF, &CharacterSrcPalette, &CorpsePalette);
 
   Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
 
@@ -101,10 +108,10 @@ void Start()
   Objects_Setup();
   PLAYER = Objects_Create(OT_Player);
 
-  for(int i=0;i < 1;i++)
+  for(int i=0;i < 6;i++)
   {
     u16 enemy = Objects_Create(OT_Enemy);
-    Objects_SetPosition(enemy, (100 + rand() % 100) * 100, (rand() % 16) * 100);
+    Objects_SetPosition(enemy, (100 + rand() % 100) * 100, (rand() % 6400));
     Objects_SetTrackingObject(enemy, PLAYER);
   }
 

@@ -35,8 +35,9 @@ typedef struct
   u8  trackingTimer;
   u8  hitTimer;
   u8  hitState;
-  u8  damage;
   u8  damageTimer;
+  u8  lastDamageTime;
+  u8  hp;
 
   i32 x;
   i32 y;
@@ -51,6 +52,9 @@ typedef struct
   u32 bIsHitting                 : 1;
   u32 bIsCrouched                : 1;
   u32 bIsBlocking                : 1;
+  u32 bIsBeingDamaged            : 1;
+  u32 bIsDead                    : 1;
+  u32 bIsDazed                   : 1;
   u32 bFrameAnimationEnded       : 1;
 
   Hitbox bounds, boundsHit;
@@ -131,7 +135,7 @@ static void Object_Initialise(Object* object, u8 type);
 static void Object_Clear(Object* object);
 static void Object_SetMoveDelta(Object* object, u8 moveVector);
 static void Object_SetMoveAction(Object* object, u8 moveAction);
-static void Object_SetPosition(Object* object, i32 x, u8 y);
+static void Object_SetPosition(Object* object, i32 x, u16 y);
 
 
 void Objects_Setup()
@@ -204,7 +208,7 @@ void Objects_Draw()
   }
 }
 
-void Objects_SetPosition(u16 id, i32 x, u8 y)
+void Objects_SetPosition(u16 id, i32 x, u16 y)
 {
   if (id != 0)
   {
@@ -352,136 +356,184 @@ static void MoveFlags2Acceleration(Object* object)
 
 static void Object_Tick(Object* object)
 {
-  i16 velocityX  = object->velocityX;
-  i16 velocityY  = object->velocityY;
+
+  i16 velocityX = object->velocityX;
+  i16 velocityY = object->velocityY;
   bool wasMoving = IsMoving(object);
 
   object->accelerationX = 0;
   object->accelerationY = 0;
 
-  if (object->type == OT_Enemy)
+  if (!object->bIsDead)
   {
-    EnemyObject_Tick(object);
-  }
-
-  if (object->bIsCrouched)
-  {
-    if (
-        object->bIsBlocking == false && 
-        object->bIsHitting  == false
-       )
+    if (object->lastDamageTime > 0)
     {
-      if (object->frameAnimation != ANIM_CrouchDown && 
-          object->frameAnimation != ANIM_CrouchBlock)
+      object->lastDamageTime--;
+
+      if (object->lastDamageTime == 0)
+        object->bIsDazed = false;
+    }
+    
+    if (object->type == OT_Enemy)
+    {
+      EnemyObject_Tick(object);
+    }
+
+    if (object->bIsBeingDamaged)
+    {
+      object->damageTimer--;
+      if (object->damageTimer == 0)
       {
-        if (IsNotReallyMoving(object))
+        object->bIsBeingDamaged = 0;
+
+        if (object->hp == 0)
         {
-          Object_ResetAnim(object, ANIM_CrouchDown);
-          object->moveState = MS_Crouch;
-          object->velocityX = 0;
-          object->velocityY = 0;
+          object->bIsDead = true;
+          Object_ResetAnim(object, ANIM_Death);
+          object->type = OT_Corpse;
+          printf("** DEAD!\n");
+        }
+        else
+        {
+          object->lastDamageTime = 4;
+          object->bIsDazed = true;
+          Object_ResetAnim(object, ANIM_Stand);
+        }
+
+        printf("** Damage End %i\n", object->hp);
+      }
+      else
+      {
+        if (object->bDirection == 1)
+          object->accelerationX -= rand() % 6;
+        else
+          object->accelerationX += rand() % 6;
+
+        object->accelerationY += (rand() % 6) - 3;
+      }
+    }
+    else
+    {
+      if (object->bIsCrouched)
+      {
+        if (
+            object->bIsBlocking == false && 
+            object->bIsHitting  == false
+           )
+        {
+          if (object->frameAnimation != ANIM_CrouchDown && 
+              object->frameAnimation != ANIM_CrouchBlock)
+          {
+            if (IsNotReallyMoving(object))
+            {
+              Object_ResetAnim(object, ANIM_CrouchDown);
+              object->moveState = MS_Crouch;
+              object->velocityX = 0;
+              object->velocityY = 0;
 
 
-          printf("** Down\n");
+              printf("** Down\n");
+            }
+          }
+        }
+      }
+      else
+      {
+        if (object->bIsBlocking == false &&
+            object->bIsHitting == false)
+        {
+          if (object->frameAnimation == ANIM_CrouchDown)
+          {
+            Object_ResetAnim(object, ANIM_CrouchUp);
+          }
+
+          if (object->frameAnimation == ANIM_CrouchUp && 
+              Animation_IsEnded(object->frameCurrent, object->frameTicks, object->frameAnimation))
+          {
+            Object_ResetAnim(object, ANIM_Stand);
+            object->moveState = MS_Walk;
+
+            printf("** Up\n");
+
+          }
+        }
+      }
+
+      if (
+          object->bIsBlocking && 
+          !object->bIsHitting)
+      {
+        if (
+          (object->frameAnimation != ANIM_StandBlock &&
+           object->frameAnimation != ANIM_CrouchBlock))
+        {
+          if (object->frameAnimation == ANIM_CrouchDown)
+          {
+            Object_ResetAnim(object, ANIM_CrouchBlock);
+
+            printf("** Block Crouch\n");
+          }
+          else
+          {
+            Object_ResetAnim(object, ANIM_StandBlock);
+
+            printf("** Block Stand\n");
+          }
+        }
+      }
+      else
+      {
+        if (object->frameAnimation == ANIM_StandBlock || object->frameAnimation == ANIM_CrouchBlock)
+        {
+          if (object->frameAnimation == ANIM_CrouchBlock)
+          {
+            Object_ResetAnimEnd(object, ANIM_CrouchDown);
+
+            printf("** Block End Crouch\n");
+          }
+          else
+          {
+            Object_ResetAnim(object, ANIM_Stand);
+            printf("** Block End Stand\n");
+          }
+        }
+      }
+
+      if ( object->bIsHitting && 
+           object->bIsBlocking == false)
+      {
+        if (object->hitState == 0)
+        {
+          if (object->bIsCrouched)
+            Object_ResetAnim(object, ANIM_CrouchPunch);
+          else
+            Object_ResetAnim(object, ANIM_StandPunch);
+          object->hitState++;
+
+          printf("** Hit Begin\n");
+        }
+        else if (object->hitState == 1)
+        {
+          if (Animation_IsEnded(object->frameCurrent, object->frameTicks, object->frameAnimation))
+          {
+            object->bIsHitting = false;
+            object->hitState = 0;
+
+            printf("** Hit End\n");
+
+            if (object->bIsCrouched)
+              Object_ResetAnimEnd(object, ANIM_CrouchDown);
+            else
+              Object_ResetAnimEnd(object, ANIM_Stand);
+          }
         }
       }
     }
-  }
-  else
-  {
-    if (object->bIsBlocking == false &&
-        object->bIsHitting == false)
-    {
-      if (object->frameAnimation == ANIM_CrouchDown)
-      {
-        Object_ResetAnim(object, ANIM_CrouchUp);
-      }
 
-      if (object->frameAnimation == ANIM_CrouchUp && 
-          Animation_IsEnded(object->frameCurrent, object->frameTicks, object->frameAnimation))
-      {
-        Object_ResetAnim(object, ANIM_Stand);
-        object->moveState = MS_Walk;
-
-        printf("** Up\n");
-
-      }
-    }
-  }
-
-  if (
-      object->bIsBlocking && 
-      !object->bIsHitting)
-  {
-    if (
-      (object->frameAnimation != ANIM_StandBlock &&
-       object->frameAnimation != ANIM_CrouchBlock))
-    {
-      if (object->frameAnimation == ANIM_CrouchDown)
-      {
-        Object_ResetAnim(object, ANIM_CrouchBlock);
-
-        printf("** Block Crouch\n");
-      }
-      else
-      {
-        Object_ResetAnim(object, ANIM_StandBlock);
-
-        printf("** Block Stand\n");
-      }
-    }
-  }
-  else
-  {
-    if (object->frameAnimation == ANIM_StandBlock || object->frameAnimation == ANIM_CrouchBlock)
-    {
-      if (object->frameAnimation == ANIM_CrouchBlock)
-      {
-        Object_ResetAnimEnd(object, ANIM_CrouchDown);
-
-        printf("** Block End Crouch\n");
-      }
-      else
-      {
-        Object_ResetAnim(object, ANIM_Stand);
-        printf("** Block End Stand\n");
-      }
-    }
-  }
-
-  if ( object->bIsHitting && 
-       object->bIsBlocking == false)
-  {
-    if (object->hitState == 0)
-    {
-      if (object->bIsCrouched)
-        Object_ResetAnim(object, ANIM_CrouchPunch);
-      else
-        Object_ResetAnim(object, ANIM_StandPunch);
-      object->hitState++;
-
-      printf("** Hit Begin\n");
-    }
-    else if (object->hitState == 1)
-    {
-      if (Animation_IsEnded(object->frameCurrent, object->frameTicks, object->frameAnimation))
-      {
-        object->bIsHitting = false;
-        object->hitState = 0;
-
-        printf("** Hit End\n");
-
-        if (object->bIsCrouched)
-          Object_ResetAnimEnd(object, ANIM_CrouchDown);
-        else
-          Object_ResetAnimEnd(object, ANIM_Stand);
-      }
-    }
-  }
-
-
-  MoveFlags2Acceleration(object);
+    MoveFlags2Acceleration(object);
   
+  }
+
   velocityX = SolveVelocity(velocityX, object->accelerationX, 50, 400);
   object->velocityX = velocityX;
   object->x += object->velocityX;
@@ -492,10 +544,13 @@ static void Object_Tick(Object* object)
   object->y = ClampPosition(object->y, &object->velocityY, 0, 6400);
   velocityY = object->velocityY;
 
-  if (velocityX > 0)
-    object->bDirection = 1;
-  else if (velocityX < 0)
-    object->bDirection = 0;
+  if (!object->bIsDead && object->bIsBeingDamaged == false)
+  {
+    if (velocityX > 0)
+      object->bDirection = 1;
+    else if (velocityX < 0)
+      object->bDirection = 0;
+  }
 
   object->moveFlags = 0;
 
@@ -522,7 +577,7 @@ static void Object_Tick(Object* object)
     object->boundsHit.y1 = object->bounds.y0 + 100 * 29;
   }
 
-  if (object->bIsHitting && object->hitState > 0)
+  if (!object->bIsDead && object->bIsHitting && object->hitState > 0)
   {
     for(u16 i=0;i < MAX_OBJECTS;i++)
     {
@@ -530,6 +585,8 @@ static void Object_Tick(Object* object)
       if (other == object)
         continue;
       if (other->type == OT_None)
+        continue;
+      if (other->bIsDead)
         continue;
 
       i32 x1 = 0;
@@ -542,26 +599,45 @@ static void Object_Tick(Object* object)
       i32 y0 = object->boundsHit.y0;
       i32 y1 = object->boundsHit.y1;
 
-      if (PointInHitbox(&other->bounds, x1, y0))
+      if (PointInHitbox(&other->bounds, x1, y0) || PointInHitbox(&other->bounds, x1, y1))
       {
-        other->damage = 20;
-        break;
-      }
-      else if (PointInHitbox(&other->bounds, x1, y1))
-      {
-        other->damage = 20;
-        break;
+        if (other->bIsBeingDamaged == false)
+        {
+          other->damageTimer = 8;
+          other->bIsBeingDamaged = 1;
+          if (object->bDirection == 1)
+            other->bDirection = 0;
+          else
+            other->bDirection = 1;
+          
+          if (other->hp > 0)
+          {
+            int amount = 1;
+
+            if (other->bIsDazed)
+            {
+              amount = 2;
+            }
+
+            i32 hp = (i32)(other->hp) - amount;
+            if (hp < 0)
+              hp = 0;
+            other->hp = hp;
+
+          }
+          Object_ResetAnim(other, ANIM_StandHit);
+          printf("** Damage Begin\n");
+          break;
+        }
       }
     }
   }
 
-  if (object->damage > 0)
-    object->damage--;
-
-
-  if (object->bIsBlocking == false && 
+  if (object->bIsDead     == false &&
+      object->bIsBlocking == false && 
       object->bIsCrouched == false && 
-      object->bIsHitting  == false)
+      object->bIsHitting  == false &&
+      object->bIsBeingDamaged == false)
   {
     if (!wasMoving && IsMoving(object))
     {
@@ -598,7 +674,7 @@ static void Object_PreTick(Object* object)
   }
 }
 
-static void Object_SetPosition(Object* object, i32 x, u8 y)
+static void Object_SetPosition(Object* object, i32 x, u16 y)
 {
   object->x = x;
   object->y = y;
@@ -635,6 +711,7 @@ static void Object_Draw(Object* object)
 {
   Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection);
 
+  #if 0
   Rect rect;
   rect.left   = object->bounds.x0 / 100;
   rect.top    = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->bounds.y0 / 100);
@@ -643,7 +720,7 @@ static void Object_Draw(Object* object)
 
   u8 colour = 16;
 
-  if (object->damage)
+  if (object->bIsBeingDamaged)
   {
     colour = 17;
   }
@@ -656,6 +733,14 @@ static void Object_Draw(Object* object)
   rect.bottom = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->boundsHit.y1 / 100);
 
   Canvas_DrawRectangle(26, rect);
+
+  rect.left   = object->sx;
+  rect.top    = object->sy;
+  rect.right  = object->sx + (object->hp);
+  rect.bottom = rect.top + 2;
+
+  Canvas_DrawRectangle(12, rect);
+  #endif
 }
 
 static void Object_Initialise(Object* object, u8 type)
@@ -665,6 +750,7 @@ static void Object_Initialise(Object* object, u8 type)
   object->type = type;
   object->moveSpeedX = 100;
   object->moveSpeedY = 100;
+  object->hp         = 8;
 }
 
 static void Object_Clear(Object* object)

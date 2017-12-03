@@ -1,6 +1,8 @@
 #include "functions.h"
 
 typedef struct {
+  u8  w;
+  u8  h;
   u8  length;
   u8  style;
   u8  speed;
@@ -10,39 +12,41 @@ typedef struct {
 } AnimationInfo;
 
 AnimationInfo kAnimationInfos[] = {
-// C  Style    Sp  X  Y
-  {1, AS_Once, 30, 0,   0,  1 },  // ANIM_Stand
-  {5, AS_Loop, 3,  64,  0,  1 },  // ANIM_Walk
-  {2, AS_Once, 5,  0,   96, 1 },  // ANIM_Punch
-  {3, AS_Once, 1,  0,   48, 1 },  // ANIM_CrouchDown
-  {3, AS_Once, 1,  0,   48, 0 },  // ANIM_CrouchUp
-  {1, AS_Once, 1,  224, 48, 1 },  // ANIM_StandBlock
-  {1, AS_Once, 1,  224, 96, 1 },  // ANIM_CrouchBlock
-  {2, AS_Once, 3,  0,   96, 1 },  // ANIM_StandPunch
-  {2, AS_Once, 3,  64,  96, 1,},  // ANIM_CrouchPunch
+// W   H   Nb Style    Spd  X  Y     Dir
+  {32, 48, 1, AS_Once, 30, 0,   0,  1 },  // ANIM_Stand
+  {32, 48, 5, AS_Loop, 3,  64,  0,  1 },  // ANIM_Walk
+  {32, 48, 2, AS_Once, 5,  0,   96, 1 },  // ANIM_Punch
+  {32, 48, 3, AS_Once, 1,  0,   48, 1 },  // ANIM_CrouchDown
+  {32, 48, 3, AS_Once, 1,  0,   48, 0 },  // ANIM_CrouchUp
+  {32, 48, 1, AS_Once, 1,  224, 48, 1 },  // ANIM_StandBlock
+  {32, 48, 1, AS_Once, 1,  224, 96, 1 },  // ANIM_CrouchBlock
+  {32, 48, 2, AS_Once, 3,  0,   96, 1 },  // ANIM_StandPunch
+  {32, 48, 2, AS_Once, 3,  64,  96, 1 },  // ANIM_CrouchPunch
+  {32, 48, 2, AS_Once, 4,  0,  144, 1 },  // ANIM_StandHit
+  {32, 48, 2, AS_Once, 4,  64, 144, 1 },  // ANIM_CrouchHit
+  {48, 48, 2, AS_Once, 4,  0,  192, 1 },  // ANIM_Death
 };
-
 
 static const u8 kAnimationCount = sizeof(kAnimationInfos) / sizeof(AnimationInfo);
 
 void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction)
 {
   SDL_Rect src, dst;
-  dst.x = x;
-  dst.y = y;
 
   if (animation >= kAnimationCount)
     animation = 0;
 
-  const int animationX = kAnimationInfos[animation].x;
-  const int animationY = kAnimationInfos[animation].y;
+  AnimationInfo* info = &kAnimationInfos[animation];
 
-  src.x = animationX + (CHARACTER_FRAME_W * frame);
-  src.y = animationY;
-  dst.w = CHARACTER_FRAME_W;
-  dst.h = CHARACTER_FRAME_H;
-  src.w = CHARACTER_FRAME_W;
-  src.h = CHARACTER_FRAME_H;
+  src.x = info->x + (info->w * frame);
+  src.y = info->y;
+  src.w = info->w;
+  src.h = info->h;
+
+  dst.x = x;
+  dst.y = y;
+  dst.w = src.w;
+  dst.h = src.h;
 
   if (direction == 1)
   {

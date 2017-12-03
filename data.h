@@ -3,7 +3,7 @@
 
 #define RETRO_WINDOW_CAPTION "RAGE"
 #define RETRO_ARENA_SIZE Kilobytes(512)
-#define WINDOW_SCALE 2
+#define WINDOW_SCALE 3
 #define RETRO_WINDOW_DEFAULT_WIDTH  (WINDOW_SCALE * 320)
 #define RETRO_WINDOW_DEFAULT_HEIGHT (WINDOW_SCALE * 224)
 #define RETRO_CANVAS_DEFAULT_WIDTH (RETRO_WINDOW_DEFAULT_WIDTH   / WINDOW_SCALE)
@@ -20,18 +20,16 @@
 
 #include "retro.h"
 
-extern Font   FONT_NEOSANS;
-extern Bitmap SPRITESHEET;
-extern Bitmap ANIMATIONS[2];
-
-extern u32    COUNTER_FRAME;
-extern u32    COUNTER_SECOND;
 
 typedef enum
 {
-  OT_None,
-  OT_Player,
-  OT_Enemy
+  OT_None = 0,
+  OT_Player = 1,
+  OT_Enemy = 2,
+  OT_Corpse = 3,
+
+
+  OT_COUNT = 3,
 } ObjectType;
 
 typedef enum
@@ -65,7 +63,10 @@ typedef enum
   ANIM_StandBlock  = 5,
   ANIM_CrouchBlock = 6,
   ANIM_StandPunch  = 7,
-  ANIM_CrouchPunch = 8
+  ANIM_CrouchPunch = 8,
+  ANIM_StandHit    = 9,
+  ANIM_CrouchHit   = 10,
+  ANIM_Death       = 11
 } AnimationType;
 
 typedef enum
@@ -74,5 +75,12 @@ typedef enum
   AS_Loop     = 1,
   AS_PingPong = 2
 } AnimationStyle;
+
+extern Font   FONT_NEOSANS;
+extern Bitmap SPRITESHEET;
+extern Bitmap ANIMATIONS[OT_COUNT];
+
+extern u32    COUNTER_FRAME;
+extern u32    COUNTER_SECOND;
 
 #endif

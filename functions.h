@@ -27,7 +27,7 @@ u16  Objects_Create(u8 type);
 void Objects_Destroy(u16 id);
 
 void Objects_SetTrackingObject(u16 id, u16 other);
-void Objects_SetPosition(u16 object, i32 x, u8 depth);
+void Objects_SetPosition(u16 object, i32 x, u16 depth);
 void Objects_SetMovementVector(u16 object, u8 movementVector);
 void Objects_SetMovementAction(u16 object, u8 movementAction);
 
