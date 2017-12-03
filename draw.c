@@ -18,8 +18,8 @@ AnimationInfo kAnimationInfos[] = {
   {3, AS_Once, 1,  0,   48, 0 },  // ANIM_CrouchUp
   {1, AS_Once, 1,  224, 48, 1 },  // ANIM_StandBlock
   {1, AS_Once, 1,  224, 96, 1 },  // ANIM_CrouchBlock
-  {2, AS_Once, 8,  0,   96, 1 },  // ANIM_StandPunch
-  {2, AS_Once, 8,  64,  96, 1,},  // ANIM_CrouchPunch
+  {2, AS_Once, 3,  0,   96, 1 },  // ANIM_StandPunch
+  {2, AS_Once, 3,  64,  96, 1,},  // ANIM_CrouchPunch
 };
 
 

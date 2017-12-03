@@ -16,6 +16,11 @@ typedef enum
 
 typedef struct
 {
+  i32 x0, y0, x1, y1;
+} Hitbox;
+
+typedef struct
+{
   i32 sx, sy;
   u8  type;
   u8  height;
@@ -30,6 +35,8 @@ typedef struct
   u8  trackingTimer;
   u8  hitTimer;
   u8  hitState;
+  u8  damage;
+  u8  damageTimer;
 
   i32 x;
   i32 y;
@@ -45,6 +52,8 @@ typedef struct
   u32 bIsCrouched                : 1;
   u32 bIsBlocking                : 1;
   u32 bFrameAnimationEnded       : 1;
+
+  Hitbox bounds, boundsHit;
   
 } Object;
 
@@ -64,6 +73,12 @@ static i32 ClampPosition(i32 position, i16* velocity, i32 min, i32 max)
     *velocity = 0;
   }
   return position;
+}
+
+static inline bool PointInHitbox(Hitbox* larger, i32 x, i32 y)
+{
+  return (x >= larger->x0 && x <= larger->x1 &&
+          y >= larger->y0 && y <= larger->y1);
 }
 
 static inline bool CanMoveForAcceleration(Object* object)
@@ -434,8 +449,8 @@ static void Object_Tick(Object* object)
     }
   }
 
-#if 0
-  if (object->bIsHitting)
+  if ( object->bIsHitting && 
+       object->bIsBlocking == false)
   {
     if (object->hitState == 0)
     {
@@ -444,6 +459,8 @@ static void Object_Tick(Object* object)
       else
         Object_ResetAnim(object, ANIM_StandPunch);
       object->hitState++;
+
+      printf("** Hit Begin\n");
     }
     else if (object->hitState == 1)
     {
@@ -452,6 +469,8 @@ static void Object_Tick(Object* object)
         object->bIsHitting = false;
         object->hitState = 0;
 
+        printf("** Hit End\n");
+
         if (object->bIsCrouched)
           Object_ResetAnimEnd(object, ANIM_CrouchDown);
         else
@@ -459,7 +478,7 @@ static void Object_Tick(Object* object)
       }
     }
   }
-#endif
+
 
   MoveFlags2Acceleration(object);
   
@@ -483,7 +502,63 @@ static void Object_Tick(Object* object)
   object->sx = object->x / SCALE;  // (For now doesn't include screen scrolling, clipping, etc.)
   object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->y / SCALE);
 
-  
+  object->bounds.x0 = object->x + CHARACTER_FRAME_W * 50 - CHARACTER_FRAME_W * 25;
+  object->bounds.y0 = object->y;
+  object->bounds.x1 = object->x + CHARACTER_FRAME_W * 50 + CHARACTER_FRAME_W * 25;
+  object->bounds.y1 = object->y + CHARACTER_FRAME_H * 100;
+
+  if (object->bDirection == 1)
+  {
+    object->boundsHit.x0 = object->bounds.x1;
+    object->boundsHit.x1 = object->bounds.x1 + 100 * 16;
+    object->boundsHit.y0 = object->bounds.y0 + 100 * 28;
+    object->boundsHit.y1 = object->bounds.y0 + 100 * 29;
+  }
+  else
+  {
+    object->boundsHit.x0 = object->bounds.x0 - 100 * 16;
+    object->boundsHit.x1 = object->bounds.x0;
+    object->boundsHit.y0 = object->bounds.y0 + 100 * 28;
+    object->boundsHit.y1 = object->bounds.y0 + 100 * 29;
+  }
+
+  if (object->bIsHitting && object->hitState > 0)
+  {
+    for(u16 i=0;i < MAX_OBJECTS;i++)
+    {
+      Object* other = &sObjects[i];
+      if (other == object)
+        continue;
+      if (other->type == OT_None)
+        continue;
+
+      i32 x1 = 0;
+      
+      if (object->bDirection == 1)
+        x1 = object->boundsHit.x1;
+      else
+        x1 = object->boundsHit.x0;
+
+      i32 y0 = object->boundsHit.y0;
+      i32 y1 = object->boundsHit.y1;
+
+      if (PointInHitbox(&other->bounds, x1, y0))
+      {
+        other->damage = 20;
+        break;
+      }
+      else if (PointInHitbox(&other->bounds, x1, y1))
+      {
+        other->damage = 20;
+        break;
+      }
+    }
+  }
+
+  if (object->damage > 0)
+    object->damage--;
+
+
   if (object->bIsBlocking == false && 
       object->bIsCrouched == false && 
       object->bIsHitting  == false)
@@ -559,6 +634,28 @@ static void Object_SetMoveAction(Object* object, u8 moveAction)
 static void Object_Draw(Object* object)
 {
   Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection);
+
+  Rect rect;
+  rect.left   = object->bounds.x0 / 100;
+  rect.top    = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->bounds.y0 / 100);
+  rect.right  = object->bounds.x1 / 100;
+  rect.bottom = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->bounds.y1 / 100);
+
+  u8 colour = 16;
+
+  if (object->damage)
+  {
+    colour = 17;
+  }
+
+  Canvas_DrawRectangle(colour, rect);
+
+  rect.left   = object->boundsHit.x0 / 100;
+  rect.top    = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->boundsHit.y0 / 100);
+  rect.right  = object->boundsHit.x1 / 100;
+  rect.bottom = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->boundsHit.y1 / 100);
+
+  Canvas_DrawRectangle(26, rect);
 }
 
 static void Object_Initialise(Object* object, u8 type)
