@@ -76,6 +76,17 @@ typedef enum
   AS_PingPong = 2
 } AnimationStyle;
 
+typedef struct
+{
+  i32 x, y, halfWidth, halfHeight;
+} HitboxTest;
+
+typedef struct
+{
+  i32 x0, y0, x1, y1;
+} Hitbox;
+
+
 extern Font   FONT_NEOSANS;
 extern Bitmap SPRITESHEET;
 extern Bitmap ANIMATIONS[OT_COUNT];

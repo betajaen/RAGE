@@ -108,7 +108,7 @@ void Start()
   Objects_Setup();
   PLAYER = Objects_Create(OT_Player);
 
-  for(int i=0;i < 6;i++)
+  for(int i=0;i < 5;i++)
   {
     u16 enemy = Objects_Create(OT_Enemy);
     Objects_SetPosition(enemy, (100 + rand() % 100) * 100, (rand() % 6400));

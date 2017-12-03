@@ -16,11 +16,6 @@ typedef enum
 
 typedef struct
 {
-  i32 x0, y0, x1, y1;
-} Hitbox;
-
-typedef struct
-{
   i32 sx, sy;
   u8  type;
   u8  height;
@@ -38,6 +33,7 @@ typedef struct
   u8  damageTimer;
   u8  lastDamageTime;
   u8  hp;
+  u8  aiHitTimer;
 
   i32 x;
   i32 y;
@@ -55,6 +51,7 @@ typedef struct
   u32 bIsBeingDamaged            : 1;
   u32 bIsDead                    : 1;
   u32 bIsDazed                   : 1;
+  u32 bAiStayDistance            : 1;
   u32 bFrameAnimationEnded       : 1;
 
   Hitbox bounds, boundsHit;
@@ -281,6 +278,8 @@ i32 SolveVelocity(i32 velocity, i32 acceleration, i32 drag, i32 maxVelocity)
   return velocity;
 }
 
+#define SQ_PX(X) ((X * 100) * (X * 100))
+
 static void EnemyObject_Tick(Object* object)
 {
 
@@ -298,7 +297,12 @@ static void EnemyObject_Tick(Object* object)
       int distanceY = (other->y - object->y);
       int distanceSq = (distanceX * distanceX) + (distanceY * distanceY);
 
-      if (distanceSq < (125 * 125))
+      bool moveCloser = (distanceSq < SQ_PX(150) && distanceSq > SQ_PX(80));
+       
+      if (object->bAiStayDistance == 0)
+        moveCloser = true;
+
+      if (moveCloser)
       {
 
         int yDiff = (object->y - other->y);
@@ -320,6 +324,29 @@ static void EnemyObject_Tick(Object* object)
         else if (object->x > other->x)
         {
           object->moveFlags |= MV_Left;
+        }
+
+      }
+
+      if (distanceSq < SQ_PX(40))
+      {
+        object->aiHitTimer--;
+
+        if (object->aiHitTimer == 0)
+        {
+          if (object->bIsDazed == false)
+          {
+            object->bIsHitting = true;
+          }
+
+          object->aiHitTimer = 64;
+        }
+        else
+        {
+          if (object->bIsDazed)
+          {
+            object->bIsHitting = false;
+          }
         }
 
       }
@@ -599,10 +626,14 @@ static void Object_Tick(Object* object)
       i32 y0 = object->boundsHit.y0;
       i32 y1 = object->boundsHit.y1;
 
-      if (PointInHitbox(&other->bounds, x1, y0) || PointInHitbox(&other->bounds, x1, y1))
+      //if (PointInHitbox(&other->bounds, x1, y0) || PointInHitbox(&other->bounds, x1, y1))
+      if (Collision_BoxVsBox_Simple(&object->boundsHit, &other->bounds))
       {
         if (other->bIsBeingDamaged == false)
         {
+
+          other->bAiStayDistance = 0;
+
           other->damageTimer = 8;
           other->bIsBeingDamaged = 1;
           if (object->bDirection == 1)
@@ -711,7 +742,7 @@ static void Object_Draw(Object* object)
 {
   Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection);
 
-  #if 0
+  #if 1
   Rect rect;
   rect.left   = object->bounds.x0 / 100;
   rect.top    = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->bounds.y0 / 100);
@@ -751,6 +782,8 @@ static void Object_Initialise(Object* object, u8 type)
   object->moveSpeedX = 100;
   object->moveSpeedY = 100;
   object->hp         = 8;
+  object->aiHitTimer = 16;
+  object->bAiStayDistance = 1;
 }
 
 static void Object_Clear(Object* object)
