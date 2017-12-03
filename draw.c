@@ -11,15 +11,19 @@ typedef struct {
 
 AnimationInfo kAnimationInfos[] = {
 // C  Style    Sp  X  Y
-  {1, AS_Once, 30, 0, 0, 1},  // ANIM_Stand
-  {5, AS_Loop, 3,  64,0, 1},  // ANIM_Walk
-  {2, AS_Once, 5,  0, 96,1},  // ANIM_Punch
-  {3, AS_Once, 2,  0, 48,1},  // ANIM_CrouchDown
-  {3, AS_Once, 2,  64,48,0 }, // ANIM_CrouchUp
+  {1, AS_Once, 30, 0,   0,  1 },  // ANIM_Stand
+  {5, AS_Loop, 3,  64,  0,  1 },  // ANIM_Walk
+  {2, AS_Once, 5,  0,   96, 1 },  // ANIM_Punch
+  {3, AS_Once, 1,  0,   48, 1 },  // ANIM_CrouchDown
+  {3, AS_Once, 1,  0,   48, 0 },  // ANIM_CrouchUp
+  {1, AS_Once, 1,  224, 48, 1 },  // ANIM_StandBlock
+  {1, AS_Once, 1,  224, 96, 1 },  // ANIM_CrouchBlock
+  {2, AS_Once, 8,  0,   96, 1 },  // ANIM_StandPunch
+  {2, AS_Once, 8,  64,  96, 1,},  // ANIM_CrouchPunch
 };
 
 
-static const u8 kAnimationCount = 4;
+static const u8 kAnimationCount = sizeof(kAnimationInfos) / sizeof(AnimationInfo);
 
 void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction)
 {
@@ -29,11 +33,6 @@ void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 directio
 
   if (animation >= kAnimationCount)
     animation = 0;
-
-  const u8 maxFrame = kAnimationInfos[animation].length;
-
-  if (frame >= maxFrame)
-    frame %= maxFrame;
 
   const int animationX = kAnimationInfos[animation].x;
   const int animationY = kAnimationInfos[animation].y;
@@ -85,19 +84,45 @@ u8 Animation_FirstFrame(u8 animation)
   return FirstFrame(anim->length, anim->direction);
 }
 
-inline static u8 IsEnded(u8 frame, u8 count, u8 direction)
+inline static u8 LastFrame(u8 count, u8 direction)
 {
+  if (direction == 1)
+    return count - 1;
+  else
+    return 0;
+}
+
+u8 Animation_LastFrame(u8 animation)
+{
+  AnimationInfo* anim = &kAnimationInfos[animation];
+
+  return LastFrame(anim->length, anim->direction);
+}
+
+inline static u8 IsEnded(u8 frame, u8 ticks, u8 maxTicks, u8 count, u8 direction)
+{
+  if (ticks != maxTicks)
+    return false;
+
   if (direction == 1)
     return frame == count - 1;
   else
     return frame == 0;
 }
 
-bool Animation_IsEnded(u8 frame, u8 animation)
+bool Animation_IsEnded(u8 frame, u8 ticks, u8 animation)
 {
   AnimationInfo* anim = &kAnimationInfos[animation];
 
-  return IsEnded(frame, anim->length, anim->direction);
+  return IsEnded(frame, ticks, anim->speed, anim->length, anim->direction);
+}
+
+u8  Animation_Speed(u8 animation)
+{
+  AnimationInfo* anim = &kAnimationInfos[animation];
+
+  return anim->speed - 1;
+
 }
 
 void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation)
@@ -114,7 +139,7 @@ void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation)
 
         if ((*ticks) == anim->speed)
         {
-          if (IsEnded(*frame, anim->length, anim->direction))
+          if (IsEnded(*frame, *ticks, anim->speed, anim->length, anim->direction))
           {
             (*ended) = 1;
           }
@@ -134,13 +159,17 @@ void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation)
 
       if ((*ticks) == anim->speed)
       {
-        (*frame) = NextFrame((*frame), anim->direction);
-        (*ticks) = 0;
-        (*ended) = 0;
-
-        if (IsEnded((*frame), anim->length, anim->direction))
+        if (IsEnded((*frame), *ticks, anim->speed, anim->length, anim->direction))
         {
           (*frame) = FirstFrame(anim->length, anim->direction);
+          (*ended) = 1;
+          (*ticks) = 0;
+        }
+        else
+        {
+          (*frame) = NextFrame((*frame), anim->direction);
+          (*ticks) = 0;
+          (*ended) = 0;
         }
       }
     }

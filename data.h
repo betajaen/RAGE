@@ -52,16 +52,20 @@ typedef enum
 {
   MA_Hit    = 1,
   MA_Crouch = 2,
-  MA_Guard  = 3
+  MA_Block  = 4
 } MovementAction;
 
 typedef enum
 {
-  ANIM_Stand      = 0,
-  ANIM_Walk       = 1,
-  ANIM_Punch      = 2,
-  ANIM_CrouchDown = 3,
-  ANIM_CrouchUp   = 3,
+  ANIM_Stand       = 0,
+  ANIM_Walk        = 1,
+  ANIM_Punch       = 2,
+  ANIM_CrouchDown  = 3,
+  ANIM_CrouchUp    = 4,
+  ANIM_StandBlock  = 5,
+  ANIM_CrouchBlock = 6,
+  ANIM_StandPunch  = 7,
+  ANIM_CrouchPunch = 8
 } AnimationType;
 
 typedef enum

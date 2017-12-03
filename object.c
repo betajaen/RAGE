@@ -28,6 +28,8 @@ typedef struct
   u8  frameCurrent;
   u8  frameTicks;
   u8  trackingTimer;
+  u8  hitTimer;
+  u8  hitState;
 
   i32 x;
   i32 y;
@@ -37,13 +39,13 @@ typedef struct
   i16 accelerationY;
 
   u16 trackingObject;
-
-  u32 bDirection          : 1;
-  u32 bIsHitting          : 1;
-  u32 bIsCrouched         : 1;
-  u32 bIsGuarding         : 1;
+  
+  u32 bDirection                 : 1;
+  u32 bIsHitting                 : 1;
+  u32 bIsCrouched                : 1;
+  u32 bIsBlocking                : 1;
   u32 bFrameAnimationEnded       : 1;
-
+  
 } Object;
 
 Object  sObjects[256];
@@ -67,7 +69,8 @@ static i32 ClampPosition(i32 position, i16* velocity, i32 min, i32 max)
 static inline bool CanMoveForAcceleration(Object* object)
 {
   return object->moveState == MS_Walk &&
-         !!!object->bIsCrouched;
+         !object->bIsCrouched &&
+         !object->bIsBlocking;
 }
 
 static inline bool IsMovingX(Object* object)
@@ -220,14 +223,20 @@ void Objects_SetTrackingObject(u16 id, u16 other)
   }
 }
 
-#define DRAG 1
-
 static void Object_ResetAnim(Object* object, u8 anim)
 {
   object->frameAnimation = anim;
   object->frameCurrent = Animation_FirstFrame(anim);
   object->frameTicks = 0;
   object->bFrameAnimationEnded = 0;
+}
+
+static void Object_ResetAnimEnd(Object* object, u8 anim)
+{
+  object->frameAnimation = anim;
+  object->frameCurrent = Animation_LastFrame(anim);
+  object->frameTicks = Animation_Speed(anim) - 1;
+  object->bFrameAnimationEnded = 1;
 }
 
 i32 SolveVelocity(i32 velocity, i32 acceleration, i32 drag, i32 maxVelocity)
@@ -340,27 +349,117 @@ static void Object_Tick(Object* object)
     EnemyObject_Tick(object);
   }
 
-  if (object->bIsCrouched == MS_Crouch)
+  if (object->bIsCrouched)
   {
-    if (object->frameAnimation != ANIM_CrouchDown)
+    if (
+        object->bIsBlocking == false && 
+        object->bIsHitting  == false
+       )
     {
-      if (IsNotReallyMoving(object))
+      if (object->frameAnimation != ANIM_CrouchDown && 
+          object->frameAnimation != ANIM_CrouchBlock)
       {
-        Object_ResetAnim(object, ANIM_CrouchDown);
-        object->moveState = MS_Crouch;
-        object->velocityX = 0;
-        object->velocityY = 0;
+        if (IsNotReallyMoving(object))
+        {
+          Object_ResetAnim(object, ANIM_CrouchDown);
+          object->moveState = MS_Crouch;
+          object->velocityX = 0;
+          object->velocityY = 0;
+
+
+          printf("** Down\n");
+        }
       }
     }
   }
   else
   {
-    if (object->frameAnimation == ANIM_CrouchDown)
+    if (object->bIsBlocking == false &&
+        object->bIsHitting == false)
     {
-      Object_ResetAnim(object, ANIM_Stand);
-      object->moveState = MS_Walk;
+      if (object->frameAnimation == ANIM_CrouchDown)
+      {
+        Object_ResetAnim(object, ANIM_CrouchUp);
+      }
+
+      if (object->frameAnimation == ANIM_CrouchUp && 
+          Animation_IsEnded(object->frameCurrent, object->frameTicks, object->frameAnimation))
+      {
+        Object_ResetAnim(object, ANIM_Stand);
+        object->moveState = MS_Walk;
+
+        printf("** Up\n");
+
+      }
     }
   }
+
+  if (
+      object->bIsBlocking && 
+      !object->bIsHitting)
+  {
+    if (
+      (object->frameAnimation != ANIM_StandBlock &&
+       object->frameAnimation != ANIM_CrouchBlock))
+    {
+      if (object->frameAnimation == ANIM_CrouchDown)
+      {
+        Object_ResetAnim(object, ANIM_CrouchBlock);
+
+        printf("** Block Crouch\n");
+      }
+      else
+      {
+        Object_ResetAnim(object, ANIM_StandBlock);
+
+        printf("** Block Stand\n");
+      }
+    }
+  }
+  else
+  {
+    if (object->frameAnimation == ANIM_StandBlock || object->frameAnimation == ANIM_CrouchBlock)
+    {
+      if (object->frameAnimation == ANIM_CrouchBlock)
+      {
+        Object_ResetAnimEnd(object, ANIM_CrouchDown);
+
+        printf("** Block End Crouch\n");
+      }
+      else
+      {
+        Object_ResetAnim(object, ANIM_Stand);
+        printf("** Block End Stand\n");
+      }
+    }
+  }
+
+#if 0
+  if (object->bIsHitting)
+  {
+    if (object->hitState == 0)
+    {
+      if (object->bIsCrouched)
+        Object_ResetAnim(object, ANIM_CrouchPunch);
+      else
+        Object_ResetAnim(object, ANIM_StandPunch);
+      object->hitState++;
+    }
+    else if (object->hitState == 1)
+    {
+      if (Animation_IsEnded(object->frameCurrent, object->frameTicks, object->frameAnimation))
+      {
+        object->bIsHitting = false;
+        object->hitState = 0;
+
+        if (object->bIsCrouched)
+          Object_ResetAnimEnd(object, ANIM_CrouchDown);
+        else
+          Object_ResetAnimEnd(object, ANIM_Stand);
+      }
+    }
+  }
+#endif
 
   MoveFlags2Acceleration(object);
   
@@ -385,34 +484,20 @@ static void Object_Tick(Object* object)
   object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->y / SCALE);
 
   
-  if (object->moveState == MS_Walk)
+  if (object->bIsBlocking == false && 
+      object->bIsCrouched == false && 
+      object->bIsHitting  == false)
   {
     if (!wasMoving && IsMoving(object))
     {
       Object_ResetAnim(object, ANIM_Walk);
+      printf("** Walk\n");
     }
     else if (wasMoving && !IsMoving(object))
     {
       Object_ResetAnim(object, ANIM_Stand);
+      printf("** Stand\n");
     }
-  }
-  else if (object->moveState == MS_Crouch)
-  {
-  }
-  else if (object->moveState == MS_Hit)
-  {
-  }
-  else if (object->moveState == MS_Block)
-  {
-  }
-  else if (object->moveState == MS_Jump)
-  {
-  }
-  else if (object->moveState == MS_Damaged)
-  {
-  }
-  else if (object->moveState == MS_KO)
-  {
   }
 
   u8 ended = 0;
@@ -421,7 +506,7 @@ static void Object_Tick(Object* object)
 
   if (object->type == OT_Player)
   {
-    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "S %i T %i F %i E %i", object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded);
+    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
   }
 }
 
@@ -433,7 +518,8 @@ static void Object_PreTick(Object* object)
   }
   else if (object->type == OT_Player)
   {
-    object->bIsCrouched = false;
+    object->bIsCrouched = 0;
+    object->bIsBlocking = 0;
   }
 }
 
@@ -450,10 +536,24 @@ static void Object_SetMoveDelta(Object* object, u8 moveVector)
 
 static void Object_SetMoveAction(Object* object, u8 moveAction)
 {
+  bool wasHitting = object->bIsHitting;
+
   object->bIsCrouched = ((moveAction & MA_Crouch) != 0);
-  object->bIsGuarding = ((moveAction & MA_Guard) != 0);
-  
-  // object->bIsHitting  = ((moveAction & MA_Hit) != 0);
+  object->bIsBlocking = ((moveAction & MA_Block) != 0);
+  object->bIsHitting  = ((moveAction & MA_Hit) != 0);
+
+  if (object->bIsHitting)
+  {
+    object->bIsBlocking = 0;
+
+    if (wasHitting)
+    {
+      object->hitTimer = 0;
+      object->hitState = 0;
+    }
+
+  }
+
 }
 
 static void Object_Draw(Object* object)

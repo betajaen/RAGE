@@ -19,7 +19,7 @@ typedef enum
   CTRL_MOVE_JUMP,
   CTRL_CROUCH,
   CTRL_HIT,
-  CTRL_GUARD,
+  CTRL_BLOCK,
 } Control;
 
 Palette CharacterSrcPalette;
@@ -62,9 +62,9 @@ void Init(Settings* settings)
 
   CharacterSrcPalette.count = 4;
   CharacterSrcPalette.colours[0] = Make_RGB(0xFF, 0x00, 0xFF);
-  CharacterSrcPalette.colours[1] = Make_RGB(0x6c, 0x74, 0x7b);
-  CharacterSrcPalette.colours[2] = Make_RGB(0xdc, 0xde, 0xe3);
-  CharacterSrcPalette.colours[3] = Make_RGB(0xf0, 0xf8, 0xf7);
+  CharacterSrcPalette.colours[1] = Make_RGB(0xFF, 0x00, 0x00);
+  CharacterSrcPalette.colours[2] = Make_RGB(0x00, 0xFF, 0x00);
+  CharacterSrcPalette.colours[3] = Make_RGB(0x00, 0x00, 0xFF);
 
   PlayerPalette.count = 4;
   PlayerPalette.colours[0] = Make_RGB(0xFF, 0x00, 0xFF);
@@ -91,7 +91,7 @@ void Init(Settings* settings)
   Input_BindKey(SDL_SCANCODE_SPACE,  CTRL_MOVE_JUMP);
   Input_BindKey(SDL_SCANCODE_H,      CTRL_CROUCH);
   Input_BindKey(SDL_SCANCODE_J,      CTRL_HIT);
-  Input_BindKey(SDL_SCANCODE_K,      CTRL_GUARD);
+  Input_BindKey(SDL_SCANCODE_K,      CTRL_BLOCK);
 
 
 }
@@ -104,7 +104,7 @@ void Start()
   for(int i=0;i < 1;i++)
   {
     u16 enemy = Objects_Create(OT_Enemy);
-    Objects_SetPosition(enemy, 300 + rand() % 100, rand() % 16);
+    Objects_SetPosition(enemy, (100 + rand() % 100) * 100, (rand() % 16) * 100);
     Objects_SetTrackingObject(enemy, PLAYER);
   }
 
@@ -141,9 +141,11 @@ void Step()
   //  nextAction = MA_Hit;
   //else 
   if (Input_GetActionDown(CTRL_CROUCH))
-    nextAction = MA_Crouch;
-  //else if (Input_GetActionReleased(CTRL_GUARD))
-  //  nextAction = MA_Guard;
+    nextAction |= MA_Crouch;
+  if (Input_GetActionDown(CTRL_BLOCK))
+    nextAction |= MA_Block;
+  if (Input_GetActionPressed(CTRL_HIT))
+    nextAction |= MA_Hit;
 
   Rect rect;
   rect.left   = 0;
