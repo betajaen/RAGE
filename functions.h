@@ -18,6 +18,7 @@ bool Animation_IsEnded(u8 frame, u8 ticks, u8 animation);
 void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation);
 
 bool Collision_BoxVsBox_Simple(Hitbox* self, Hitbox* other);
+bool Collision_BoxVsBox(HitboxResult* outHit, Hitbox* self, Hitbox* other);
 
 void Objects_Setup();
 void Objects_Teardown();

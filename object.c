@@ -1,6 +1,6 @@
 #include "functions.h"
 
-#define MAX_OBJECTS 256
+#define MAX_OBJECTS 20
 #define SCALE 100
 
 typedef enum 
@@ -34,6 +34,9 @@ typedef struct
   u8  lastDamageTime;
   u8  hp;
   u8  aiHitTimer;
+  i32 aiSoftTargetX;
+  i32 aiSoftTargetY;
+  u8  aiSoftTargetTimer;
 
   i32 x;
   i32 y;
@@ -51,6 +54,7 @@ typedef struct
   u32 bIsBeingDamaged            : 1;
   u32 bIsDead                    : 1;
   u32 bIsDazed                   : 1;
+  u32 bAiIsHead                  : 1;
   u32 bAiStayDistance            : 1;
   u32 bFrameAnimationEnded       : 1;
 
@@ -134,6 +138,7 @@ static void Object_SetMoveDelta(Object* object, u8 moveVector);
 static void Object_SetMoveAction(Object* object, u8 moveAction);
 static void Object_SetPosition(Object* object, i32 x, u16 y);
 
+void GroupEnemyObject_Tick();
 
 void Objects_Setup()
 {
@@ -179,6 +184,8 @@ void Objects_PreTick()
       Object_PreTick(object);
     }
   }
+
+  GroupEnemyObject_Tick();
 }
 
 void Objects_Tick()
@@ -278,7 +285,126 @@ i32 SolveVelocity(i32 velocity, i32 acceleration, i32 drag, i32 maxVelocity)
   return velocity;
 }
 
-#define SQ_PX(X) ((X * 100) * (X * 100))
+static void GroupEnemyObject_Tick()
+{
+  // See if there is a head, if not. Assign first.
+  // Others should tick down and move to a random spot around target.
+
+  Object* head = NULL;
+  Object* player = NULL;
+
+  for (int i = 0; i < MAX_OBJECTS; i++)
+  {
+    Object* object = &sObjects[i];
+    if (object->type != OT_Player || object->bIsDead)
+      continue;
+    player = object;
+    break;
+  }
+
+  if (player == NULL)
+    return;
+
+  for(int i=0;i < MAX_OBJECTS;i++)
+  {
+    Object* object = &sObjects[i];
+    if (object->type != OT_Enemy || object->bIsDead)
+      continue;
+    
+    if (object->bAiIsHead)
+    {
+      head = object;
+      break;
+    }
+  }
+
+  // No head? We assign one, and with the others, we pick a target around the player.
+  if (head == NULL)
+  {
+    for (int i = 0; i < MAX_OBJECTS; i++)
+    {
+      Object* object = &sObjects[i];
+      if (object->type != OT_Enemy || object->bIsDead)
+        continue;
+
+      if (head == NULL)
+      {
+        object->bAiIsHead = 1;
+        head = object;
+      }
+      else
+      {
+        object->bAiIsHead = 0;
+
+        object->aiSoftTargetX = ((rand() % 300)) * 100;
+        object->aiSoftTargetY = ((rand() % 64)) * 100;
+
+        if (object->aiSoftTargetX < 0)
+          object->aiSoftTargetX = 0;
+
+        if (object->aiSoftTargetY < 0)
+          object->aiSoftTargetY = 0;
+        else if (object->aiSoftTargetY > 6400)
+          object->aiSoftTargetY = 6400;
+
+        object->aiSoftTargetTimer = 1 + rand() % (30 * 8);
+      }
+    }
+  }
+  else
+  {
+    for (int i = 0; i < MAX_OBJECTS; i++)
+    {
+      Object* object = &sObjects[i];
+      if (object->type != OT_Enemy || object->bIsDead)
+        continue;
+      if (object == head)
+      {
+      }
+      else
+      {
+        object->aiSoftTargetTimer--;
+
+        if (object->aiSoftTargetTimer == 0)
+        {
+          object->aiSoftTargetTimer = 1 + rand() % 15;
+
+          object->aiSoftTargetX = ((rand() % 300)) * 100;
+          object->aiSoftTargetY = ((rand() % 64)) * 100;
+
+          if (object->aiSoftTargetX < 0)
+            object->aiSoftTargetX = 0;
+
+          if (object->aiSoftTargetY < 0)
+            object->aiSoftTargetY = 0;
+          else if (object->aiSoftTargetY > 6400)
+            object->aiSoftTargetY = 6400;
+
+          object->aiSoftTargetTimer = 1 + rand() % (30 * 8);
+
+        }
+
+      }
+    }
+  }
+
+}
+
+#define SQ_PX(X) ((X * X) * 100)
+
+static inline MovementVector MaybeOpposite(bool cond, MovementVector dt)
+{
+  if (!cond)
+    return dt;
+  switch (dt)
+  {
+  case MV_Up:   return MV_Down;
+  case MV_Down:  return MV_Up;
+  case MV_Left:  return MV_Right;
+  case MV_Right: return MV_Left;
+  }
+  return dt;
+}
 
 static void EnemyObject_Tick(Object* object)
 {
@@ -289,46 +415,78 @@ static void EnemyObject_Tick(Object* object)
 
     if (object->trackingTimer == 0)
     {
-      Object* other = &sObjects[object->trackingObject - 1];
+      int distanceX = 0, distanceY = 0;
 
       object->trackingTimer = 1 + rand() % 3;
+     
+      if (object->bAiIsHead)
+      {
+        Object* other = &sObjects[object->trackingObject - 1];
 
-      int distanceX = (other->x - object->x);
-      int distanceY = (other->y - object->y);
+        distanceX = (other->x - object->x);
+        distanceY = (other->y - object->y);
+      }
+      else
+      {
+        distanceX = (object->aiSoftTargetX - object->x);
+        distanceY = (object->aiSoftTargetY - object->y);
+      }
+      
       int distanceSq = (distanceX * distanceX) + (distanceY * distanceY);
 
-      bool moveCloser = (distanceSq < SQ_PX(150) && distanceSq > SQ_PX(80));
+      bool shouldMove = true; // (distanceSq < SQ_PX(150) && distanceSq > SQ_PX(80));
+      bool moveAway = false;
        
       if (object->bAiStayDistance == 0)
-        moveCloser = true;
+        shouldMove = true;
+      
+      if (object->bAiIsHead && distanceSq < SQ_PX(60))
+      {
+        Object* other = &sObjects[object->trackingObject - 1];
 
-      if (moveCloser)
+        HitboxResult result;
+        if (Collision_BoxVsBox(&result, &object->bounds, &other->bounds))
+        {
+          shouldMove = true;
+          distanceX = (result.position.x - object->x);
+          distanceY = (result.position.y - object->y);
+        }
+        else
+        {
+          shouldMove = true;
+          moveAway = true;
+        }
+      }
+      else if (object->bAiIsHead == false && distanceSq < SQ_PX(60))
+      {
+        shouldMove = false;
+        moveAway = false;
+      }
+
+      if (shouldMove)
       {
 
-        int yDiff = (object->y - other->y);
-
-        if (yDiff > 2)
+        if (distanceY < 0)
         {
-          object->moveFlags |= MV_Down;
-
+          object->moveFlags |= MaybeOpposite(moveAway, MV_Down);
         }
-        else if (yDiff < 2)
+        else if (distanceY > 0)
         {
-          object->moveFlags |= MV_Up;
+          object->moveFlags |= MaybeOpposite(moveAway, MV_Up);
         }
 
-        if (object->x < other->x)
+        if (distanceX > 0)
         {
-          object->moveFlags |= MV_Right;
+          object->moveFlags |= MaybeOpposite(moveAway, MV_Right);
         }
-        else if (object->x > other->x)
+        else if (distanceX < 0)
         {
-          object->moveFlags |= MV_Left;
+          object->moveFlags |= MaybeOpposite(moveAway, MV_Left);
         }
 
       }
 
-      if (distanceSq < SQ_PX(40))
+      if (object->bAiIsHead && distanceSq < SQ_PX(40))
       {
         object->aiHitTimer--;
 
@@ -418,6 +576,7 @@ static void Object_Tick(Object* object)
           object->bIsDead = true;
           Object_ResetAnim(object, ANIM_Death);
           object->type = OT_Corpse;
+          object->bAiIsHead = 0;
           printf("** DEAD!\n");
         }
         else
@@ -604,7 +763,8 @@ static void Object_Tick(Object* object)
     object->boundsHit.y1 = object->bounds.y0 + 100 * 29;
   }
 
-  if (!object->bIsDead && object->bIsHitting && object->hitState > 0)
+  if (!object->bIsDead && 
+      object->bIsHitting && object->hitState == 1)
   {
     for(u16 i=0;i < MAX_OBJECTS;i++)
     {
@@ -626,9 +786,10 @@ static void Object_Tick(Object* object)
       i32 y0 = object->boundsHit.y0;
       i32 y1 = object->boundsHit.y1;
 
-      //if (PointInHitbox(&other->bounds, x1, y0) || PointInHitbox(&other->bounds, x1, y1))
       if (Collision_BoxVsBox_Simple(&object->boundsHit, &other->bounds))
       {
+        object->hitState = 2;
+
         if (other->bIsBeingDamaged == false)
         {
 
@@ -742,7 +903,18 @@ static void Object_Draw(Object* object)
 {
   Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection);
 
-  #if 1
+  if (object->bAiIsHead == 1)
+  {
+    Rect rect;
+    rect.left   = object->sx;
+    rect.top    = object->sy;
+    rect.right  = rect.left + 2;
+    rect.bottom = rect.top + 2;
+
+    Canvas_DrawRectangle(16, rect);
+  }
+
+  #if 0
   Rect rect;
   rect.left   = object->bounds.x0 / 100;
   rect.top    = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->bounds.y0 / 100);
@@ -781,9 +953,10 @@ static void Object_Initialise(Object* object, u8 type)
   object->type = type;
   object->moveSpeedX = 100;
   object->moveSpeedY = 100;
-  object->hp         = 8;
+  object->hp         = 4;
   object->aiHitTimer = 16;
   object->bAiStayDistance = 1;
+  object->bAiIsHead  = 0;
 }
 
 static void Object_Clear(Object* object)

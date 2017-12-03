@@ -83,6 +83,11 @@ typedef struct
 
 typedef struct
 {
+  Point position, normal, delta;
+} HitboxResult;
+
+typedef struct
+{
   i32 x0, y0, x1, y1;
 } Hitbox;
 
