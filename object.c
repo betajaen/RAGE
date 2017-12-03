@@ -27,8 +27,6 @@ typedef struct
   u8  frameAnimation;
   u8  frameCurrent;
   u8  frameTicks;
-  u8  frameCount;
-  u8  frameRate;
   u8  trackingTimer;
 
   i32 x;
@@ -40,17 +38,73 @@ typedef struct
 
   u16 trackingObject;
 
-  u32 bAnimationState     : 1;
   u32 bDirection          : 1;
   u32 bIsHitting          : 1;
   u32 bIsCrouched         : 1;
   u32 bIsGuarding         : 1;
-  u32 frameAnimationStyle : 2;
+  u32 bFrameAnimationEnded       : 1;
 
 } Object;
 
 Object  sObjects[256];
 Object* sDrawOrder[256];
+
+static i32 ClampPosition(i32 position, i16* velocity, i32 min, i32 max)
+{
+  if (position < min)
+  {
+    position = min;
+    *velocity = 0;
+  }
+  else if (position > max)
+  {
+    position = max;
+    *velocity = 0;
+  }
+  return position;
+}
+
+static inline bool CanMoveForAcceleration(Object* object)
+{
+  return object->moveState == MS_Walk &&
+         !!!object->bIsCrouched;
+}
+
+static inline bool IsMovingX(Object* object)
+{
+  return object->velocityX != 0;
+}
+
+static inline bool IsMovingY(Object* object)
+{
+  return object->velocityY != 0;
+}
+
+static inline bool IsNotReallyMovingX(Object* object)
+{
+  return abs(object->velocityX) < 25;
+}
+
+static inline bool IsNotReallyMovingY(Object* object)
+{
+  return abs(object->velocityY) < 25;
+}
+
+static inline bool IsMoving(Object* object)
+{
+  return IsMovingX(object) || IsMovingY(object);
+}
+
+static inline bool IsNotReallyMoving(Object* object)
+{
+  return IsNotReallyMovingX(object) || IsNotReallyMovingY(object);
+}
+
+static inline bool IsReallyCrouching(Object* object)
+{
+  return !!object->bIsCrouched && object->frameAnimation == ANIM_CrouchDown && !!object->bFrameAnimationEnded;
+}
+
 
 static void Object_PreTick(Object* object);
 static void Object_Tick(Object* object);
@@ -171,11 +225,9 @@ void Objects_SetTrackingObject(u16 id, u16 other)
 static void Object_ResetAnim(Object* object, u8 anim)
 {
   object->frameAnimation = anim;
+  object->frameCurrent = Animation_FirstFrame(anim);
   object->frameTicks = 0;
-  u8 style = object->frameAnimationStyle;
-
-  Animation_GetInfo(object->frameAnimation, &object->frameRate, &object->frameCount, &style);
-  object->frameAnimationStyle = style;
+  object->bFrameAnimationEnded = 0;
 }
 
 i32 SolveVelocity(i32 velocity, i32 acceleration, i32 drag, i32 maxVelocity)
@@ -250,6 +302,8 @@ static void EnemyObject_Tick(Object* object)
 
 static void MoveFlags2Acceleration(Object* object)
 {
+  if (CanMoveForAcceleration(object) == false)
+    return;
 
   if ((object->moveFlags & MV_Left) != 0)
   {
@@ -272,47 +326,10 @@ static void MoveFlags2Acceleration(Object* object)
   }
 }
 
-static i32 ClampPosition(i32 position, i16* velocity, i32 min, i32 max)
-{
-  if (position < min)
-  { 
-    position = min;
-    *velocity = 0;
-  }
-  else if (position > max)
-  {
-    position = max;
-    *velocity = 0;
-  }
-  return position;
-}
-
-static inline bool IsMovingX(Object* object)
-{
-  return object->velocityX != 0;
-}
-
-static inline bool IsMovingY(Object* object)
-{
-  return object->velocityY != 0;
-}
-
-static inline bool IsMoving(Object* object)
-{
-  return IsMovingX(object) || IsMovingY(object);
-}
-
 static void Object_Tick(Object* object)
 {
-  u8 newDirection = object->bDirection;
-  bool resetAnim  = false;
-  bool movingAnim = false;
-  
   i16 velocityX  = object->velocityX;
   i16 velocityY  = object->velocityY;
-  i16 lastVelocityX = velocityX;
-  i16 lastVelocityY = velocityY;
-
   bool wasMoving = IsMoving(object);
 
   object->accelerationX = 0;
@@ -321,6 +338,28 @@ static void Object_Tick(Object* object)
   if (object->type == OT_Enemy)
   {
     EnemyObject_Tick(object);
+  }
+
+  if (object->bIsCrouched == MS_Crouch)
+  {
+    if (object->frameAnimation != ANIM_CrouchDown)
+    {
+      if (IsNotReallyMoving(object))
+      {
+        Object_ResetAnim(object, ANIM_CrouchDown);
+        object->moveState = MS_Crouch;
+        object->velocityX = 0;
+        object->velocityY = 0;
+      }
+    }
+  }
+  else
+  {
+    if (object->frameAnimation == ANIM_CrouchDown)
+    {
+      Object_ResetAnim(object, ANIM_Stand);
+      object->moveState = MS_Walk;
+    }
   }
 
   MoveFlags2Acceleration(object);
@@ -345,11 +384,8 @@ static void Object_Tick(Object* object)
   object->sx = object->x / SCALE;  // (For now doesn't include screen scrolling, clipping, etc.)
   object->sy = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->y / SCALE);
 
-  if (object->bIsCrouched == MS_Crouch)
-  {
-
-  }
-  else if (object->moveState == MS_Walk)
+  
+  if (object->moveState == MS_Walk)
   {
     if (!wasMoving && IsMoving(object))
     {
@@ -359,6 +395,9 @@ static void Object_Tick(Object* object)
     {
       Object_ResetAnim(object, ANIM_Stand);
     }
+  }
+  else if (object->moveState == MS_Crouch)
+  {
   }
   else if (object->moveState == MS_Hit)
   {
@@ -376,72 +415,14 @@ static void Object_Tick(Object* object)
   {
   }
 
-  switch(object->frameAnimationStyle)
+  u8 ended = 0;
+  Animation_NextFrame(&object->frameTicks, &object->frameCurrent, &ended, object->frameAnimation);
+  object->bFrameAnimationEnded = ended;
+
+  if (object->type == OT_Player)
   {
-    case AS_Once:
-    {
-      if (object->frameCurrent < object->frameCount)
-      {
-        object->frameTicks++;
-
-        if (object->frameTicks == object->frameRate)
-        { 
-          object->frameCurrent++;
-          object->frameTicks = 0;
-        }
-      }
-    }
-    break;
-    case AS_Loop:
-    {
-      object->frameTicks++;
-
-      if (object->frameTicks == object->frameRate)
-      {
-        object->frameCurrent++;
-        object->frameTicks = 0;
-
-        if (object->frameCurrent == object->frameCount)
-          object->frameCurrent = 0;
-      }
-    }
-    break;
-    case AS_PingPong:
-    {
-      if (object->bAnimationState == 1)
-      {
-        object->frameTicks++;
-
-        if (object->frameTicks == object->frameRate)
-        {
-          object->frameCurrent++;
-          object->frameTicks = 0;
-
-          if (object->frameCurrent == object->frameCount)
-          {
-            object->bAnimationState = 0;
-          }
-        }
-      }
-      else
-      {
-        object->frameTicks++;
-
-        if (object->frameTicks == object->frameRate)
-        {
-          object->frameCurrent--;
-          object->frameTicks = 0;
-
-          if (object->frameCurrent == object->frameCount)
-          {
-            object->bAnimationState = 1;
-          }
-        }
-      }
-    }
-    break;
+    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "S %i T %i F %i E %i", object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded);
   }
-  
 }
 
 static void Object_PreTick(Object* object)

@@ -6,14 +6,16 @@ typedef struct {
   u8  speed;
   u16 x;
   u16 y;
+  u8  direction;
 } AnimationInfo;
 
 AnimationInfo kAnimationInfos[] = {
 // C  Style    Sp  X  Y
-  {1, AS_Once, 30, 0, 0},   // ANIM_Stand
-  {5, AS_Loop, 3,  64,0},   // ANIM_Walk
-  {2, AS_Once, 5,  0, 96},  // ANIM_Punch
-  {3, AS_Once, 5,  64,96},  // ANIM_Crouch
+  {1, AS_Once, 30, 0, 0, 1},  // ANIM_Stand
+  {5, AS_Loop, 3,  64,0, 1},  // ANIM_Walk
+  {2, AS_Once, 5,  0, 96,1},  // ANIM_Punch
+  {3, AS_Once, 2,  0, 48,1},  // ANIM_CrouchDown
+  {3, AS_Once, 2,  64,48,0 }, // ANIM_CrouchUp
 };
 
 
@@ -58,4 +60,130 @@ void Animation_GetInfo(u8 type, u8* speed, u8* frameCount, u8* animStyle)
   *frameCount = kAnimationInfos[type].length;
   *animStyle  = kAnimationInfos[type].style;
   *speed      = kAnimationInfos[type].speed;
+}
+
+inline static u8 NextFrame(u8 frame, u8 direction)
+{
+  if (direction == 1)
+    return frame + 1;
+  else
+    return frame - 1;
+}
+
+inline static u8 FirstFrame(u8 count, u8 direction)
+{
+  if (direction == 1)
+    return 0;
+  else
+    return count - 1;
+}
+
+u8 Animation_FirstFrame(u8 animation)
+{
+  AnimationInfo* anim = &kAnimationInfos[animation];
+
+  return FirstFrame(anim->length, anim->direction);
+}
+
+inline static u8 IsEnded(u8 frame, u8 count, u8 direction)
+{
+  if (direction == 1)
+    return frame == count - 1;
+  else
+    return frame == 0;
+}
+
+bool Animation_IsEnded(u8 frame, u8 animation)
+{
+  AnimationInfo* anim = &kAnimationInfos[animation];
+
+  return IsEnded(frame, anim->length, anim->direction);
+}
+
+void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation)
+{
+  AnimationInfo* anim = &kAnimationInfos[animation];
+
+  switch (anim->style)
+  {
+    case AS_Once:
+    {
+      if ((*frame) < anim->length)
+      {
+        (*ticks) = (*ticks) + 1;
+
+        if ((*ticks) == anim->speed)
+        {
+          if (IsEnded(*frame, anim->length, anim->direction))
+          {
+            (*ended) = 1;
+          }
+          else
+          {
+            (*frame) = NextFrame((*frame), anim->direction);
+            (*ticks) = 0;
+            (*ended) = 0;
+          }
+        }
+      }
+    }
+    break;
+    case AS_Loop:
+    {
+      (*ticks) = (*ticks) + 1;
+
+      if ((*ticks) == anim->speed)
+      {
+        (*frame) = NextFrame((*frame), anim->direction);
+        (*ticks) = 0;
+        (*ended) = 0;
+
+        if (IsEnded((*frame), anim->length, anim->direction))
+        {
+          (*frame) = FirstFrame(anim->length, anim->direction);
+        }
+      }
+    }
+    break;
+#if 0
+    case AS_PingPong:
+    {
+      if (object->bAnimationState == 1)
+      {
+        object->bAnimationEnd = 0;
+
+        if (object->frameTicks == object->frameRate)
+        {
+          object->frameCurrent++;
+          object->frameTicks = 0;
+
+          if (object->frameCurrent == object->frameCount)
+          {
+            object->bAnimationState = 0;
+          }
+        }
+
+        object->frameTicks++;
+      }
+      else
+      {
+        object->bAnimationEnd = 0;
+
+        if (object->frameTicks == object->frameRate)
+        {
+          object->frameCurrent--;
+          object->frameTicks = 0;
+
+          if (object->frameCurrent == object->frameCount)
+          {
+            object->bAnimationState = 1;
+          }
+        }
+
+        object->frameTicks++;
+      }
+    }
+    break;
+#endif
+  }
 }

@@ -57,9 +57,11 @@ typedef enum
 
 typedef enum
 {
-  ANIM_Stand = 0,
-  ANIM_Walk  = 1,
-  ANIM_Punch = 2,
+  ANIM_Stand      = 0,
+  ANIM_Walk       = 1,
+  ANIM_Punch      = 2,
+  ANIM_CrouchDown = 3,
+  ANIM_CrouchUp   = 3,
 } AnimationType;
 
 typedef enum

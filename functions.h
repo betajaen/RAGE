@@ -2,6 +2,7 @@
 #define FUNCTIONS_H
 
 #include "data.h"
+#include <stdio.h>
 #include <stdlib.h>
 
 void Init(Settings* settings);
@@ -9,7 +10,10 @@ void Start();
 void Step();
 
 void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction);
-void Animation_GetInfo(u8 type, u8* speed, u8* frameCount, u8* animStyle);
+
+u8   Animation_FirstFrame(u8 animation);
+bool Animation_IsEnded(u8 frame, u8 animation);
+void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation);
 
 void Objects_Setup();
 void Objects_Teardown();
