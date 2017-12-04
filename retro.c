@@ -140,6 +140,12 @@ typedef union
   SDL_GetRenderDrawColor(gRenderer, &T.r, &T.g, &T.b, &TAlpha); \
   SDL_SetRenderDrawColor(gRenderer, RGB.r, RGB.g, RGB.b, 0xFF);
 
+#define RETRO_SDL_DRAW_PUSH_RGB2(T, R, G, B) \
+  SDL_Color T; u8 TAlpha;\
+  SDL_GetRenderDrawColor(gRenderer, &T.r, &T.g, &T.b, &TAlpha); \
+  SDL_SetRenderDrawColor(gRenderer, R, G, B, 0xFF);
+
+
 #define RETRO_SDL_DRAW_POP_RGB(T) \
   SDL_SetRenderDrawColor(gRenderer, T.r, T.g, T.b, 0xFF);
 
@@ -147,6 +153,12 @@ typedef union
   SDL_Color T; \
   SDL_GetTextureColorMod(TEXTURE, &T.r, &T.g, &T.b); \
   SDL_SetTextureColorMod(TEXTURE, RGB.r, RGB.g, RGB.b);
+
+#define RETRO_SDL_TEXTURE_PUSH_RGB2(T, TEXTURE, R, G, B) \
+  SDL_Color T; \
+  SDL_GetTextureColorMod(TEXTURE, &T.r, &T.g, &T.b); \
+  SDL_SetTextureColorMod(TEXTURE, R, G, B);
+
 
 #define RETRO_SDL_TEXTURE_POP_RGB(T, TEXTURE) \
   SDL_SetTextureColorMod(TEXTURE, T.r, T.g, T.b);
@@ -701,12 +713,32 @@ void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectang
   SDL_RenderCopy(gRenderer, texture, srcRectangle, dstRectangle);
 }
 
+void  Canvas_Splat3Colour(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, u8 r, u8 g, u8 b)
+{
+  SDL_Texture* texture = (SDL_Texture*)bitmap->texture;
+  RETRO_SDL_TEXTURE_PUSH_RGB2(t, texture, r, g, b);
+
+  SDL_RenderCopy(gRenderer, texture, srcRectangle, dstRectangle);
+
+  RETRO_SDL_TEXTURE_POP_RGB(t, texture);
+}
+
 void Canvas_SplatFlip(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, u8 flipFlags)
 {
   assert(srcRectangle);
 
   SDL_Texture* texture = (SDL_Texture*) bitmap->texture;
   SDL_RenderCopyEx(gRenderer, texture, srcRectangle, dstRectangle, 0.0f, NULL, flipFlags);
+}
+
+void Canvas_SplatFlipColour(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, u8 flipFlags, u8 r, u8 g, u8 b)
+{
+  assert(srcRectangle);
+
+  SDL_Texture* texture = (SDL_Texture*)bitmap->texture;
+  RETRO_SDL_TEXTURE_PUSH_RGB2(t, texture, r, g, b);
+  SDL_RenderCopyEx(gRenderer, texture, srcRectangle, dstRectangle, 0.0f, NULL, flipFlags);
+  RETRO_SDL_TEXTURE_POP_RGB(t, texture);
 }
 
 void Canvas_Place(StaticSpriteObject* spriteObject)

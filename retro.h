@@ -321,6 +321,8 @@ void  Canvas_Splat2(Bitmap* bitmap, i32 x, i32 y, SDL_Rect* srcRectangle);
 
 void  Canvas_Splat3(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle);
 
+void  Canvas_Splat3Colour(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, u8 r, u8 g, u8 b);
+
 typedef enum
 {
   FF_None     = SDL_FLIP_NONE,
@@ -331,6 +333,8 @@ typedef enum
 } FlipFlags;
 
 void  Canvas_SplatFlip(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, u8 flipFlags);
+
+void  Canvas_SplatFlipColour(Bitmap* bitmap, SDL_Rect* dstRectangle, SDL_Rect* srcRectangle, u8 flipFlags, u8 r, u8 g, u8 b);
 
 void  Canvas_Place(StaticSpriteObject* spriteObject);
 

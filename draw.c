@@ -29,7 +29,7 @@ AnimationInfo kAnimationInfos[] = {
 
 static const u8 kAnimationCount = sizeof(kAnimationInfos) / sizeof(AnimationInfo);
 
-void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction)
+void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction, u8 depth)
 {
   SDL_Rect src, dst;
 
@@ -48,13 +48,26 @@ void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 directio
   dst.w = src.w;
   dst.h = src.h;
 
+  u8 r, g, b;
+
+  if (depth >= 3)
+    depth = 3;
+
+  switch(depth)
+  {
+    case 0: r = 0xFF; g = 0xFF; b = 0xFF; break;
+    case 1: r = 0xAA; g = 0xAA; b = 0xAA; break;
+    case 2: r = 0x88; g = 0x88; b = 0x88; break;
+    case 3: r = 0x44; g = 0x44; b = 0x44; break;
+  }
+
   if (direction == 1)
   {
-    Canvas_Splat3(&ANIMATIONS[type - 1], &dst, &src);
+    Canvas_Splat3Colour(&ANIMATIONS[type - 1], &dst, &src, r, g, b);
   }
   else
   {
-    Canvas_SplatFlip(&ANIMATIONS[type - 1], &dst, &src, SDL_FLIP_HORIZONTAL);
+    Canvas_SplatFlipColour(&ANIMATIONS[type - 1], &dst, &src, SDL_FLIP_HORIZONTAL, r, g, b);
   }
 }
 

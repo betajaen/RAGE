@@ -9,7 +9,7 @@ void Init(Settings* settings);
 void Start();
 void Step();
 
-void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction);
+void Draw_Animation(i32 x, i32 y, u8 type, u32 animation, u32 frame, i8 direction, u8 depth);
 
 u8   Animation_FirstFrame(u8 animation);
 u8   Animation_LastFrame(u8 animation);

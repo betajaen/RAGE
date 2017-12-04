@@ -24,6 +24,7 @@ typedef struct
   u8  moveState;
   u8  moveFlags;
 
+  u8  frameDepth;
   u8  frameAnimation;
   u8  frameCurrent;
   u8  frameTicks;
@@ -32,11 +33,12 @@ typedef struct
   u8  hitState;
   u8  damageTimer;
   u8  lastDamageTime;
-  u8  hp;
+  u8  hp; 
   u8  aiHitTimer;
   i32 aiSoftTargetX;
   i32 aiSoftTargetY;
   u8  aiSoftTargetTimer;
+  
 
   i32 x;
   i32 y;
@@ -58,12 +60,14 @@ typedef struct
   u32 bAiStayDistance            : 1;
   u32 bFrameAnimationEnded       : 1;
 
+  u16 nextDrawId;
+
   Hitbox bounds, boundsHit;
   
 } Object;
 
-Object  sObjects[256];
-Object* sDrawOrder[256];
+Object  sObjects[MAX_OBJECTS];
+u16     sDrawOrder[64];
 
 static i32 ClampPosition(i32 position, i16* velocity, i32 min, i32 max)
 {
@@ -176,6 +180,11 @@ void Objects_Destroy(u16 id)
 
 void Objects_PreTick()
 {
+  for (int i = 0; i < 64;i++)
+  {
+    sDrawOrder[i] = 0;
+  }
+
   for (int i = 0; i < MAX_OBJECTS; i++)
   {
     Object* object = &sObjects[i];
@@ -198,10 +207,42 @@ void Objects_Tick()
       Object_Tick(object);
     }
   }
+
+  for (int i = 0; i < MAX_OBJECTS; i++)
+  {
+    Object* object = &sObjects[i];
+    u8 y = object->y / 100;
+    if (y < 0)
+     y = 0;
+    else if (y >= 64)
+     y = 63;
+    
+    if (y < 32)
+      object->frameDepth = 0;
+    else if (y < 40)
+      object->frameDepth = 1;
+    else if (y < 50)
+      object->frameDepth = 2;
+    else
+      object->frameDepth = 3;
+
+    y = 63 - y;
+
+    u16 head = sDrawOrder[y];
+
+    if (head != 0)
+    {
+      object->nextDrawId = head;
+    }
+    
+    sDrawOrder[y] = 1 + i;
+  }
+
 }
 
 void Objects_Draw()
 {
+#if 0
   for (int i = 0; i < MAX_OBJECTS; i++)
   {
     Object* object = &sObjects[i];
@@ -210,6 +251,18 @@ void Objects_Draw()
       Object_Draw(object);
     }
   }
+#else
+  for(int i=0;i < 64;i++)
+  {
+    u16 head = sDrawOrder[i];
+    while(head != 0)
+    {
+      Object* obj = &sObjects[head - 1];
+      Object_Draw(obj);
+      head = obj->nextDrawId;
+    }
+  }
+#endif
 }
 
 void Objects_SetPosition(u16 id, i32 x, u16 y)
@@ -448,8 +501,9 @@ static void EnemyObject_Tick(Object* object)
         if (Collision_BoxVsBox(&result, &object->bounds, &other->bounds))
         {
           shouldMove = true;
-          distanceX = (result.position.x - object->x);
-          distanceY = (result.position.y - object->y);
+          //distanceX = (result.position.x - object->x);
+          //distanceY = (result.position.y - object->y);
+          moveAway = true;
         }
         else
         {
@@ -855,6 +909,8 @@ static void Object_Tick(Object* object)
 
 static void Object_PreTick(Object* object)
 {
+  object->nextDrawId = 0;
+
   if (object->type == OT_Enemy)
   {
 //    MarkDepth(object->x, object->y);
@@ -901,7 +957,9 @@ static void Object_SetMoveAction(Object* object, u8 moveAction)
 
 static void Object_Draw(Object* object)
 {
-  Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection);
+  
+
+  Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection, object->frameDepth);
 
   if (object->bAiIsHead == 1)
   {
