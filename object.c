@@ -638,12 +638,13 @@ static void EnemyObject_Tick(Object* object)
 
         if (object->aiHitTimer == 0)
         {
+          object->aiHitTimer = 4;
+
           if (object->bIsDazed == false)
           {
             object->bIsHitting = true;
           }
 
-          object->aiHitTimer = 4;
         }
         else
         {
@@ -803,7 +804,6 @@ static void Object_Tick(Object* object, bool stillScreen)
             object->moveState = MS_Walk;
 
             printf("** Up\n");
-
           }
         }
       }
@@ -959,6 +959,7 @@ static void Object_Tick(Object* object, bool stillScreen)
         if (Collision_BoxVsBox_Simple(&object->aiDetection, &other->bounds))
         {
           object->hitState++;
+          object->aiHitTimer = 16;
 
           if (other->bIsBeingDamaged == false)
           {
@@ -1148,7 +1149,7 @@ static void Object_Initialise(Object* object, u8 type, u8 section)
   object->moveSpeedX = 100;
   object->moveSpeedY = 100;
   object->hp         = 4;
-  object->aiHitTimer = 16;
+  object->aiHitTimer = 4;
   object->bAiStayDistance = 1;
   object->bAiIsHead  = 0;
   object->section    = section;
