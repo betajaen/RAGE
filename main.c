@@ -2,7 +2,7 @@
 #include "functions.h"
 #include "retro.c"
 
-Font   FONT_NEOSANS;
+Font   FONT_KAGESANS;
 Bitmap SPRITESHEET;
 Bitmap ANIMATIONS[OT_COUNT];
 u32    COUNTER_FRAME;
@@ -79,7 +79,7 @@ void Init(Settings* settings)
   Bitmap_Load24_PaletteSwap("character.png", &ANIMATIONS[1], 0xFF, 0x00, 0xFF, &CharacterSrcPalette, &EnemyPalette);
   Bitmap_Load24_PaletteSwap("character.png", &ANIMATIONS[2], 0xFF, 0x00, 0xFF, &CharacterSrcPalette, &CorpsePalette);
 
-  Font_Load("NeoSans.png", &FONT_NEOSANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
+  Font_Load("KageSans.png", &FONT_KAGESANS, Colour_Make(0,0,255), Colour_Make(255,0,255));
 
   Input_BindKey(SDL_SCANCODE_ESCAPE, CTRL_QUIT);
   Input_BindKey(SDL_SCANCODE_W,      CTRL_MOVE_UP);

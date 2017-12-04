@@ -2,6 +2,8 @@
 
 #define MAX_OBJECTS 20
 #define SCALE 100
+#define RAGE_TIMER 25
+
 
 typedef enum 
 {
@@ -39,7 +41,8 @@ typedef struct
   i32 aiSoftTargetX;
   i32 aiSoftTargetY;
   u8  aiSoftTargetTimer;
-  
+  u8  rage;
+  u8  rageTimer;
 
   i32 x;
   i32 y;
@@ -555,6 +558,24 @@ static inline MovementVector MaybeOpposite(bool cond, MovementVector dt)
   return dt;
 }
 
+static void PlayerObject_Tick(Object* object)
+{
+  if (object->rage > 0)
+  {
+    if (object->rage >= 16)
+    {
+      object->rage = 16;
+    }
+
+    object->rageTimer--;
+    if (object->rageTimer == 0)
+    {
+      object->rageTimer = RAGE_TIMER;
+      object->rage--;
+    }
+  }
+}
+
 static void EnemyObject_Tick(Object* object)
 {
 
@@ -726,7 +747,11 @@ static void Object_Tick(Object* object, bool stillScreen)
         object->bIsDazed = false;
     }
     
-    if (object->type == OT_Enemy)
+    if (object->type == OT_Player)
+    {
+      PlayerObject_Tick(object);
+    }
+    else if (object->type == OT_Enemy)
     {
       EnemyObject_Tick(object);
     }
@@ -982,6 +1007,11 @@ static void Object_Tick(Object* object, bool stillScreen)
                 amount = 2;
               }
 
+              if (other->type == OT_Player && other->rage < 12)
+              {
+                amount = 0;
+              }
+
               i32 hp = (i32)(other->hp) - amount;
               if (hp < 0)
                 hp = 0;
@@ -1021,9 +1051,9 @@ static void Object_Tick(Object* object, bool stillScreen)
 
   if (object->type == OT_Player)
   {
-    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "Hit State = %i", object->hitState);
+ //   Canvas_PrintF(0, 0, &FONT_KAGESANS, 3, "Hit State = %i", object->hitState);
 
-//     Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "%i %i S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->x / 100, object->y / 100, object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
+//     Canvas_PrintF(0, 0, &FONT_KAGESANS, 3, "%i %i S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->x / 100, object->y / 100, object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
   }
 }
 
@@ -1070,6 +1100,12 @@ static void Object_SetMoveAction(Object* object, u8 moveAction)
   {
     object->bIsBlocking = 0;
 
+    if (wasHitting && object->type == OT_Player)
+    {
+      object->rage++;
+      object->rageTimer = RAGE_TIMER;
+    }
+
     if (wasHitting)
     {
       object->hitTimer = 0;
@@ -1091,6 +1127,69 @@ static void Object_Draw(Object* object, i32 xOffset)
 
   Draw_Animation(x, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection, object->frameDepth);
 
+  if (object->type == OT_Player)
+  {
+    int x = 10;
+    int y = 10;
+
+    if (object->rage >= 16)
+    {
+      x += -10 + (rand() % 20);
+      y += -10 + (rand() % 20);
+    }
+    else if (object->rage >= 12)
+    {
+      x += -3 + (rand() % 6);
+      y += -3 + (rand() % 6);
+    }
+    else if (object->rage >= 8)
+    {
+      x += -2 + (rand() % 4);
+      y += -2 + (rand() % 4);
+    }
+    else if (object->rage >= 4)
+    {
+      x += -1 + (rand() % 2);
+      y += -1 + (rand() % 2);
+    }
+
+    Canvas_PrintF(x + 1, y + 1, &FONT_KAGESANS, 5, "RAGE");
+    Canvas_PrintF(x, y, &FONT_KAGESANS, 3, "RAGE");
+
+    Rect rageRect;
+    rageRect.left = x + (8 * 5);
+    rageRect.right = rageRect.left + object->rage * 4;
+    rageRect.top  = y;
+    rageRect.bottom = y+8;
+    Canvas_DrawFilledRectangle(9, rageRect);
+    rageRect.left -= 1;
+    rageRect.right = rageRect.left + 65;
+    rageRect.top -=1;
+    rageRect.bottom += 1;
+    Canvas_DrawRectangle(5, rageRect);
+
+    SDL_Rect src, dst;
+    src.x = 32;
+    src.y = 16;
+    src.w = 11;
+    src.h = 10;
+
+    dst.x = rageRect.left;
+    dst.y = rageRect.top += 12;
+    dst.w = src.w;
+    dst.h = src.h;
+
+    for(int i=0;i < object->hp;i++)
+    {
+
+      Canvas_Splat3(&SPRITESHEET, &dst, &src);
+
+      dst.x += src.w;
+    }
+
+  }
+
+  #if 0
   if (object->bAiIsHead == 1)
   {
     Rect rect;
@@ -1102,7 +1201,6 @@ static void Object_Draw(Object* object, i32 xOffset)
     Canvas_DrawRectangle(16, rect);
   }
 
-  #if 0
   Rect rect;
   rect.left   = object->bounds.x0 / 100;
   rect.top    = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->bounds.y0 / 100);

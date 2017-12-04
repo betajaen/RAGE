@@ -106,7 +106,7 @@ typedef struct
 } Hitbox;
 
 
-extern Font   FONT_NEOSANS;
+extern Font   FONT_KAGESANS;
 extern Bitmap SPRITESHEET;
 extern Bitmap ANIMATIONS[OT_COUNT];
 

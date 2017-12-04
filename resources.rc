@@ -1,4 +1,4 @@
-NeoSans.png RESOURCE "assets/NeoSans.png"
+KageSans.png RESOURCE "assets/KageSans.png"
 tile.png RESOURCE "assets/tile.png"
 character.png RESOURCE "assets/character.png"
 level1.tmx RESOURCE "assets/level1.tmx"
