@@ -5,6 +5,8 @@
 Font   FONT_KAGESANS;
 Bitmap SPRITESHEET;
 Bitmap ANIMATIONS[OT_COUNT];
+Sound  HIT_SOUNDS[18];
+
 u32    COUNTER_FRAME;
 u32    COUNTER_SECOND;
 u16    PLAYER;
@@ -46,6 +48,25 @@ inline Rect Make_Rect2(i32 l, i32 t, i32 r, i32 b)
 
 void Init(Settings* settings)
 {
+  Sound_Load(&HIT_SOUNDS[0],  "Hit0.wav");
+  Sound_Load(&HIT_SOUNDS[1],  "Hit1.wav");
+  Sound_Load(&HIT_SOUNDS[2],  "Hit2.wav");
+  Sound_Load(&HIT_SOUNDS[3],  "Hit3.wav");
+  Sound_Load(&HIT_SOUNDS[4],  "Hit4.wav");
+  Sound_Load(&HIT_SOUNDS[5],  "Hit5.wav");
+  Sound_Load(&HIT_SOUNDS[6],  "Hit6.wav");
+  Sound_Load(&HIT_SOUNDS[7],  "Hit7.wav");
+  Sound_Load(&HIT_SOUNDS[8],  "Hit8.wav");
+  Sound_Load(&HIT_SOUNDS[9],  "Hit9.wav");
+  Sound_Load(&HIT_SOUNDS[10], "Hit10.wav");
+  Sound_Load(&HIT_SOUNDS[11], "Hit11.wav");
+  Sound_Load(&HIT_SOUNDS[12], "Hit12.wav");
+  Sound_Load(&HIT_SOUNDS[13], "Hit13.wav");
+  Sound_Load(&HIT_SOUNDS[14], "Hit14.wav");
+  Sound_Load(&HIT_SOUNDS[15], "Hit15.wav");
+  Sound_Load(&HIT_SOUNDS[16], "Hit16.wav");
+  Sound_Load(&HIT_SOUNDS[17], "Hit17.wav");
+
   Palette_Make(&settings->palette);
 
   Palette_LoadFromBitmap("tile.png", &settings->palette);
@@ -257,4 +278,10 @@ void Step()
     Objects_KO(OT_Enemy);
   }
 
+}
+
+void Sound_PlayHit()
+{
+  int idx = rand() % 17;
+  Sound_Play(&HIT_SOUNDS[idx], RETRO_SOUND_DEFAULT_VOLUME);
 }

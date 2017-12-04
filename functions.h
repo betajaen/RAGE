@@ -28,6 +28,7 @@ void Level_PrevSection();
 void Level_NextSection();
 void Level_PostNextSection();
 
+void Sound_PlayHit();
 
 bool Collision_BoxVsBox_Simple(Hitbox* self, Hitbox* other);
 bool Collision_BoxVsBox(HitboxResult* outHit, Hitbox* self, Hitbox* other);

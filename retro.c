@@ -1535,7 +1535,11 @@ void Retro_SDL_SoundCallback(void* userdata, u8* stream, int streamLength)
     }
 
     
-    SDL_MixAudioFormat(stream, soundObj->sound->buffer + soundObj->p, soundObj->sound->spec.format, mixLength, SDL_MIX_MAXVOLUME / 2);
+    SDL_MixAudioFormat(stream, 
+    soundObj->sound->buffer + soundObj->p, 
+    soundObj->sound->spec.format,
+    mixLength, 
+    SDL_MIX_MAXVOLUME); // / 2);
 
     soundObj->p += mixLength;
 

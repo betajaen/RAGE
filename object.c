@@ -567,11 +567,15 @@ static void PlayerObject_Tick(Object* object)
       object->rage = 16;
     }
 
-    object->rageTimer--;
-    if (object->rageTimer == 0)
+    if (object->bIsBlocking == false && object->bIsCrouched)
     {
-      object->rageTimer = RAGE_TIMER;
-      object->rage--;
+
+      object->rageTimer--;
+      if (object->rageTimer == 0)
+      {
+        object->rageTimer = RAGE_TIMER;
+        object->rage--;
+      }
     }
   }
 }
@@ -885,6 +889,7 @@ static void Object_Tick(Object* object, bool stillScreen)
           object->hitState++;
 
           printf("** Hit Begin\n");
+
         }
         else if (object->hitState >= 2 || (object->hitState == 1 && object->type == OT_Player))
         {
@@ -986,7 +991,7 @@ static void Object_Tick(Object* object, bool stillScreen)
           object->hitState++;
           object->aiHitTimer = 16;
 
-          if (other->bIsBeingDamaged == false)
+          if (other->bIsBeingDamaged == false && other->bIsBlocking == false)
           {
 
             other->bAiStayDistance = 0;
@@ -1029,6 +1034,7 @@ static void Object_Tick(Object* object, bool stillScreen)
                 hp = 0;
               other->hp = hp;
 
+              Sound_PlayHit();
             }
             Object_ResetAnim(other, ANIM_StandHit);
             printf("** Damage Begin\n");
