@@ -20,10 +20,13 @@ bool Animation_IsEnded(u8 frame, u8 ticks, u8 animation);
 void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation);
 
 void Level_Load(const char* name);
+
 void Level_Draw(i32 offset);
 
 void Level_StartSection(u8 sectionIdx);
 void Level_NextSection();
+void Level_PostNextSection();
+
 
 bool Collision_BoxVsBox_Simple(Hitbox* self, Hitbox* other);
 bool Collision_BoxVsBox(HitboxResult* outHit, Hitbox* self, Hitbox* other);
@@ -37,13 +40,15 @@ void Objects_Clear();
 void Objects_ClearExcept(u8 type);
 
 u16  Objects_FindFirstOf(u8 type);
-u16  Objects_Create(u8 type);
+u16  Objects_Create(u8 type, u8 section);
 void Objects_Destroy(u16 id);
+void Objects_DestroySection(u8 section);
+void Objects_KO(u8 type);
 
 void Objects_SetTrackingObject(u16 id, u16 other);
 void Objects_SetTrackingObjectType(u8 type, u16 other);
 void Objects_SetPosition(u16 object, i32 x, u16 depth);
-void Objects_ModPosition(u16 object);
+void Objects_ModPositions();
 void Objects_SetMovementVector(u16 object, u8 movementVector);
 void Objects_SetMovementAction(u16 object, u8 movementAction);
 

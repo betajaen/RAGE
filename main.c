@@ -222,6 +222,7 @@ void Step()
 
     if (levelOffset == 320)
     {
+      Level_PostNextSection();
       levelState = 1;
     }
   }
@@ -232,15 +233,20 @@ void Step()
     Objects_Draw(0);
   }
 
-  if ( Objects_FindFirstOf(OT_Enemy) == 0 || Input_GetActionPressed(CTRL_CHEAT))
+  if ( Objects_FindFirstOf(OT_Enemy) == 0)
   {
+    Objects_ModPositions();
     Level_NextSection();
     PLAYER = Objects_FindFirstOf(OT_Player);
     Objects_SetTrackingObjectType(OT_Enemy, PLAYER);
-    Objects_ModPosition(PLAYER);
     levelState = 0;
     levelOffset = 0;
     levelTimer = 0;
+  }
+
+  if (Input_GetActionReleased(CTRL_CHEAT))
+  {
+    Objects_KO(OT_Enemy);
   }
 
 }

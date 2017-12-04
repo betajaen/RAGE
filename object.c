@@ -23,6 +23,7 @@ typedef struct
   u8  moveSpeedY;
   u8  moveState;
   u8  moveFlags;
+  u8  section;
 
   u8  frameDepth;
   u8  frameAnimation;
@@ -62,7 +63,7 @@ typedef struct
 
   u16 nextDrawId;
 
-  Hitbox bounds, boundsHit;
+  Hitbox bounds, boundsHit, aiDetection;
   
 } Object;
 
@@ -136,12 +137,13 @@ static inline bool IsReallyCrouching(Object* object)
 static void Object_PreTick(Object* object);
 static void Object_Tick(Object* object, bool stillScreen);
 static void Object_Draw(Object* object, i32 xOffset);
-static void Object_Initialise(Object* object, u8 type);
+static void Object_Initialise(Object* object, u8 type, u8 section);
 static void Object_Clear(Object* object);
 static void Object_SetMoveDelta(Object* object, u8 moveVector);
 static void Object_SetMoveAction(Object* object, u8 moveAction);
 static void Object_SetPosition(Object* object, i32 x, u16 y);
 static void Object_ModPosition(Object* object);
+static void Object_ResetAnim(Object* object, u8 anim);
 
 void GroupEnemyObject_Tick();
 
@@ -155,14 +157,14 @@ void Objects_Teardown()
   SDL_memset(&sObjects, 0, sizeof(sObjects));
 }
 
-u16  Objects_Create(u8 type)
+u16  Objects_Create(u8 type, u8 section)
 {
   for (int i = 0; i < MAX_OBJECTS; i++)
   {
     Object* object = &sObjects[i];
     if (object->type == 0)
     {
-      Object_Initialise(object, type);
+      Object_Initialise(object, type, section);
 
       return 1 + i;
     }
@@ -176,6 +178,38 @@ void Objects_Destroy(u16 id)
   if (id != 0)
   {
     Object_Clear(&sObjects[id - 1]);
+  }
+}
+
+void Objects_DestroySection(u8 section)
+{
+  for (int i = 0; i < MAX_OBJECTS; i++)
+  {
+    Object* object = &sObjects[i];
+    if (object->section == section)
+    {
+      Object_Clear(object);
+    }
+  }
+}
+
+void Object_KO(Object* object)
+{
+  object->bIsDead = true;
+  Object_ResetAnim(object, ANIM_Death);
+  object->type = OT_Corpse;
+  object->bAiIsHead = 0;
+}
+
+void Objects_KO(u8 type)
+{
+  for (int i = 0; i < MAX_OBJECTS; i++)
+  {
+    Object* object = &sObjects[i];
+    if (object->type == type)
+    {
+      Object_KO(object);
+    }
   }
 }
 
@@ -307,12 +341,18 @@ void Objects_SetPosition(u16 id, i32 x, u16 y)
   }
 }
 
-void Objects_ModPosition(u16 id)
+void Objects_ModPositions()
 {
-  if (id != 0)
+
+  for (int i = 0; i < MAX_OBJECTS; i++)
   {
-    Object_ModPosition(&sObjects[id - 1]);
+    Object* object = &sObjects[i];
+    if (object->type != 0)
+    {
+      Object_ModPosition(object);
+    }
   }
+
 }
 
 void Objects_SetMovementVector(u16 id, u8 movementVector)
@@ -525,9 +565,10 @@ static void EnemyObject_Tick(Object* object)
     if (object->trackingTimer == 0)
     {
       int distanceX = 0, distanceY = 0;
-
       object->trackingTimer = 1 + rand() % 3;
-     
+      
+      bool tryHit = false;
+      
       if (object->bAiIsHead)
       {
         Object* other = &sObjects[object->trackingObject - 1];
@@ -549,22 +590,17 @@ static void EnemyObject_Tick(Object* object)
       if (object->bAiStayDistance == 0)
         shouldMove = true;
       
-      if (object->bAiIsHead && distanceSq < SQ_PX(60))
+      if (object->bAiIsHead)
       {
         Object* other = &sObjects[object->trackingObject - 1];
 
         HitboxResult result;
-        if (Collision_BoxVsBox(&result, &object->bounds, &other->bounds))
+        if (Collision_BoxVsBox(&result, &object->aiDetection, &other->bounds))
         {
-          shouldMove = true;
-          //distanceX = (result.position.x - object->x);
-          //distanceY = (result.position.y - object->y);
-          moveAway = true;
-        }
-        else
-        {
-          shouldMove = true;
-          moveAway = true;
+          //shouldMove = true;
+          //moveAway = true;
+          tryHit = true;
+          shouldMove = false;
         }
       }
       else if (object->bAiIsHead == false && distanceSq < SQ_PX(60))
@@ -596,7 +632,7 @@ static void EnemyObject_Tick(Object* object)
 
       }
 
-      if (object->bAiIsHead && distanceSq < SQ_PX(40))
+      if (object->bAiIsHead && tryHit)
       {
         object->aiHitTimer--;
 
@@ -607,7 +643,7 @@ static void EnemyObject_Tick(Object* object)
             object->bIsHitting = true;
           }
 
-          object->aiHitTimer = 64;
+          object->aiHitTimer = 4;
         }
         else
         {
@@ -703,10 +739,7 @@ static void Object_Tick(Object* object, bool stillScreen)
 
         if (object->hp == 0)
         {
-          object->bIsDead = true;
-          Object_ResetAnim(object, ANIM_Death);
-          object->type = OT_Corpse;
-          object->bAiIsHead = 0;
+          Object_KO(object);
           printf("** DEAD!\n");
         }
         else
@@ -828,7 +861,7 @@ static void Object_Tick(Object* object, bool stillScreen)
 
           printf("** Hit Begin\n");
         }
-        else if (object->hitState == 1)
+        else if (object->hitState >= 2 || (object->hitState == 1 && object->type == OT_Player))
         {
           if (Animation_IsEnded(object->frameCurrent, object->frameTicks, object->frameAnimation))
           {
@@ -880,18 +913,23 @@ static void Object_Tick(Object* object, bool stillScreen)
 
   if (object->bDirection == 1)
   {
-    object->boundsHit.x0 = object->bounds.x1;
+    object->boundsHit.x0 = object->x + CHARACTER_FRAME_W * 50;
     object->boundsHit.x1 = object->bounds.x1 + 100 * 16;
-    object->boundsHit.y0 = object->bounds.y0 + 100 * 28;
-    object->boundsHit.y1 = object->bounds.y0 + 100 * 29;
+    object->boundsHit.y0 = object->bounds.y0 + 100 * 25;
+    object->boundsHit.y1 = object->bounds.y0 + 100 * 30;
   }
   else
   {
     object->boundsHit.x0 = object->bounds.x0 - 100 * 16;
-    object->boundsHit.x1 = object->bounds.x0;
-    object->boundsHit.y0 = object->bounds.y0 + 100 * 28;
-    object->boundsHit.y1 = object->bounds.y0 + 100 * 29;
+    object->boundsHit.x1 = object->x + CHARACTER_FRAME_W * 50;
+    object->boundsHit.y0 = object->bounds.y0 + 100 * 25;
+    object->boundsHit.y1 = object->bounds.y0 + 100 * 30;
   }
+
+  object->aiDetection.x0 = object->bounds.x0 - 100 * 16;
+  object->aiDetection.x1 = object->bounds.x1 + 100 * 16;
+  object->aiDetection.y0 = object->y;
+  object->aiDetection.y1 = object->y + CHARACTER_FRAME_H * 100;
 
   if (stillScreen)
   {
@@ -918,9 +956,9 @@ static void Object_Tick(Object* object, bool stillScreen)
         i32 y0 = object->boundsHit.y0;
         i32 y1 = object->boundsHit.y1;
 
-        if (Collision_BoxVsBox_Simple(&object->boundsHit, &other->bounds))
+        if (Collision_BoxVsBox_Simple(&object->aiDetection, &other->bounds))
         {
-          object->hitState = 2;
+          object->hitState++;
 
           if (other->bIsBeingDamaged == false)
           {
@@ -951,9 +989,9 @@ static void Object_Tick(Object* object, bool stillScreen)
             }
             Object_ResetAnim(other, ANIM_StandHit);
             printf("** Damage Begin\n");
-            break;
           }
         }
+        break;
       }
     }
 
@@ -982,7 +1020,9 @@ static void Object_Tick(Object* object, bool stillScreen)
 
   if (object->type == OT_Player)
   {
-    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "%i %i S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->x / 100, object->y / 100, object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
+    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "Hit State = %i", object->hitState);
+
+//     Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "%i %i S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->x / 100, object->y / 100, object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
   }
 }
 
@@ -1082,7 +1122,14 @@ static void Object_Draw(Object* object, i32 xOffset)
   rect.right  = object->boundsHit.x1 / 100;
   rect.bottom = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->boundsHit.y1 / 100);
 
-  Canvas_DrawRectangle(26, rect);
+  Canvas_DrawRectangle(45, rect);
+
+  rect.left = object->aiDetection.x0 / 100;
+  rect.top = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->aiDetection.y0 / 100);
+  rect.right = object->aiDetection.x1 / 100;
+  rect.bottom = SCREEN_HEIGHT - SCREEN_BOTTOM_EDGE - (object->aiDetection.y1 / 100);
+
+  Canvas_DrawRectangle(45, rect);
 
   rect.left   = object->sx;
   rect.top    = object->sy;
@@ -1093,7 +1140,7 @@ static void Object_Draw(Object* object, i32 xOffset)
   #endif
 }
 
-static void Object_Initialise(Object* object, u8 type)
+static void Object_Initialise(Object* object, u8 type, u8 section)
 {
   SDL_memset(object, 0, sizeof(Object));
   
@@ -1104,6 +1151,7 @@ static void Object_Initialise(Object* object, u8 type)
   object->aiHitTimer = 16;
   object->bAiStayDistance = 1;
   object->bAiIsHead  = 0;
+  object->section    = section;
 }
 
 static void Object_Clear(Object* object)

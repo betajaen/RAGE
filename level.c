@@ -258,7 +258,7 @@ void Level_StartSection(u8 sectionIdx)
   sLevel.currentSection = sectionIdx;
   Section* section = &sLevel.sections[sectionIdx];
 
-  Objects_ClearExcept(OT_Player);
+  // Objects_ClearExcept(OT_Player);
 
   for(u32 i=0;i < section->numObjects;i++)
   {
@@ -270,7 +270,10 @@ void Level_StartSection(u8 sectionIdx)
       {
         if (sectionIdx == 0)
         {
-          id = Objects_Create(OT_Player);
+          if (Objects_FindFirstOf(OT_Player) == 0)
+          {
+            id = Objects_Create(OT_Player, 0xFF);
+          }
         }
       }
       break;
@@ -279,7 +282,7 @@ void Level_StartSection(u8 sectionIdx)
       case 6:
       case 7:
       {
-        id = Objects_Create(OT_Enemy);
+        id = Objects_Create(OT_Enemy, sectionIdx);
       }
       break;
       case 8:
@@ -306,4 +309,12 @@ void Level_NextSection()
     Level_StartSection(0);
   else
     Level_StartSection(next);
+}
+
+void Level_PostNextSection()
+{
+  if (sLevel.currentSection > 0)
+  {
+    Objects_DestroySection(sLevel.currentSection - 1);
+  }
 }
