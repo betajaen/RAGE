@@ -1012,6 +1012,12 @@ static void Object_Tick(Object* object, bool stillScreen)
               {
                 amount = 0;
                 other->rageTimer = RAGE_TIMER;
+
+                if (other->rage < 4)
+                {
+                  other->rage++;
+                }
+
               }
               else if (object->type == OT_Player && other->rage >= RAGE_VUN)
               {
@@ -1257,6 +1263,12 @@ static void Object_Initialise(Object* object, u8 type, u8 section)
   object->bAiStayDistance = 1;
   object->bAiIsHead  = 0;
   object->section    = section;
+  object->rage       = 0;
+  object->rageTimer  = 1;
+  if (type == OT_Enemy)
+    object->bDirection = 0;
+  else if (type == OT_Player)
+    object->bDirection = 1;
 }
 
 static void Object_Clear(Object* object)

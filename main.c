@@ -128,6 +128,14 @@ void Step()
     COUNTER_SECOND++;
   }
 
+  if (Objects_FindFirstOf(OT_Player) == 0)
+  {
+    Objects_Clear();
+    Level_PrevSection();
+    PLAYER = Objects_FindFirstOf(OT_Player);
+    Objects_SetTrackingObjectType(OT_Enemy, PLAYER);
+  }
+
   Objects_PreTick();
 
   int nextMovement = 0;

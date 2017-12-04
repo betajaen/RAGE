@@ -302,6 +302,16 @@ void Level_StartSection(u8 sectionIdx)
 
 }
 
+void Level_PrevSection()
+{
+  u8 prev = sLevel.currentSection - 1;
+
+  if (prev == -1)
+    Level_StartSection(0);
+  else
+    Level_StartSection(prev);
+}
+
 void Level_NextSection()
 {
   u32 next = sLevel.currentSection + 1;

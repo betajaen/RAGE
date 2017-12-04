@@ -24,6 +24,7 @@ void Level_Load(const char* name);
 void Level_Draw(i32 offset);
 
 void Level_StartSection(u8 sectionIdx);
+void Level_PrevSection();
 void Level_NextSection();
 void Level_PostNextSection();
 
