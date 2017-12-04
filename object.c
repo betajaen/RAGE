@@ -178,6 +178,27 @@ void Objects_Destroy(u16 id)
   }
 }
 
+void Objects_Clear()
+{
+  for(int i=0;i < MAX_OBJECTS;i++)
+  {
+    Object_Clear(&sObjects[i]);
+  }
+}
+
+u16  Objects_FindFirstOf(u8 type)
+{
+  for (int i = 0; i < MAX_OBJECTS; i++)
+  {
+    Object* object = &sObjects[i];
+    if (object->type == type)
+    {
+      return 1 + i;
+    }
+  }
+  return 0;
+}
+
 void Objects_PreTick()
 {
   for (int i = 0; i < 64;i++)

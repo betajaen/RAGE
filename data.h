@@ -76,6 +76,20 @@ typedef enum
   AS_PingPong = 2
 } AnimationStyle;
 
+typedef enum
+{
+  CTRL_QUIT,
+  CTRL_MOVE_LEFT,
+  CTRL_MOVE_RIGHT,
+  CTRL_MOVE_UP,
+  CTRL_MOVE_DOWN,
+  CTRL_MOVE_JUMP,
+  CTRL_CROUCH,
+  CTRL_HIT,
+  CTRL_BLOCK,
+  CTRL_CHEAT
+} Control;
+
 typedef struct
 {
   i32 x, y, halfWidth, halfHeight;

@@ -3,6 +3,8 @@
 #define TILE_SIZE 16
 #define SECTION_W 20
 #define SECTION_H 14
+#define MAX_OBJECTS_PER_SECTION 16
+#define SECTION_PX_W (SECTION_W * TILE_SIZE)
 
 static char* skipWhitespace(char* s)
 {
@@ -53,10 +55,18 @@ static char* readUInt(char* s, u32* i)
   return s;
 }
 
+typedef struct
+{
+  i32 x, y;
+  u8  type;
+  u8  flags;
+} ObjectSpawn;
 
 typedef struct
 {
-  u16 tiles[SECTION_W * SECTION_H];
+  u8          numObjects;
+  u16         tiles[SECTION_W * SECTION_H];
+  ObjectSpawn objects[MAX_OBJECTS_PER_SECTION];
 } Section;
 
 typedef struct
@@ -84,6 +94,7 @@ void Level_Load(const char* t)
   sLevel.numSections = width / SECTION_W;
   sLevel.currentSection = 0;
   sLevel.sections = malloc(sizeof(Section) * sLevel.numSections);
+  SDL_memset(sLevel.sections, 0, sizeof(Section) * sLevel.numSections);
 
   skipToString(data, &data, "=\"csv\">");
   SDL_assert(data);
@@ -121,7 +132,58 @@ void Level_Load(const char* t)
     }
   }
 
-  printf("%i", sectionIdx);
+  while(true)
+  {
+    u32  type;
+    u32  x, y;
+
+    if (skipToString(data, &data, "gid=\"") == false)
+      break;
+
+    data = skipPassString(data, "gid=\"");
+    data = readUInt(data, &type);
+
+    skipToString(data, &data, "x=\"");
+    SDL_assert(data);
+    data = skipPassString(data, "x=\"");
+    data = readUInt(data, &x);
+
+    skipToString(data, &data, "y=\"");
+    SDL_assert(data);
+    data = skipPassString(data, "y=\"");
+    data = readUInt(data, &y);
+    
+    u32 sectionIdx = x / SECTION_PX_W;
+    x = x % SECTION_PX_W;
+    
+    y -= 144;
+
+    y = 63 - y;
+
+    if (y < 0)
+      y = 0;
+    else if (y > 63)
+      y = 63;
+
+    SDL_assert(sectionIdx < sLevel.numSections);
+
+    Section* section = &sLevel.sections[sectionIdx];
+    if (section->numObjects == MAX_OBJECTS_PER_SECTION)
+    {
+      printf("Out of objects room for section %i", sectionIdx);
+      continue;
+    }
+
+    ObjectSpawn obj;
+    obj.type = type - 1;
+    obj.flags = 0;
+    obj.x = (x + 8) * 100;
+    obj.y = (y) * 100;
+
+    section->objects[section->numObjects] = obj;
+    section->numObjects++;
+
+  }
 
 }
 
@@ -152,5 +214,65 @@ void Level_Draw()
 
       Canvas_Splat3(&SPRITESHEET, &dst, &src);
     }
+  }
+}
+
+void Level_StartSection(u8 sectionIdx)
+{
+  sLevel.currentSection = sectionIdx;
+  Section* section = &sLevel.sections[sectionIdx];
+
+  Objects_Clear();
+
+  for(u32 i=0;i < section->numObjects;i++)
+  {
+    ObjectSpawn* spawn = &section->objects[i];
+    u16 id = 0;
+    switch(spawn->type)
+    {
+      case 3:
+      {
+        id = Objects_Create(OT_Player);
+      }
+      break;
+      case 4:
+      case 5:
+      case 6:
+      case 7:
+      {
+        id = Objects_Create(OT_Enemy);
+      }
+      break;
+      case 8:
+      {
+        // Passive
+        // Objects_Create(OT_Passive);
+      }
+      break;
+    }
+
+    if (id == 0)
+      continue;
+
+    Objects_SetPosition(id, spawn->x, spawn->y);
+
+  }
+
+}
+
+void Level_NextSection()
+{
+  u32 next = sLevel.currentSection + 1;
+  if (next == sLevel.numSections)
+    Level_StartSection(0);
+  else
+    Level_StartSection(next);
+}
+
+void Level_Tick()
+{
+  if (Input_GetActionPressed(CTRL_CHEAT))
+  {
+    sLevel.currentSection++;
   }
 }

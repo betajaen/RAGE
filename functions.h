@@ -22,6 +22,10 @@ void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation);
 void Level_Load(const char* name);
 void Level_Draw();
 
+void Level_StartSection(u8 sectionIdx);
+void Level_NextSection();
+void Level_Tick();
+
 bool Collision_BoxVsBox_Simple(Hitbox* self, Hitbox* other);
 bool Collision_BoxVsBox(HitboxResult* outHit, Hitbox* self, Hitbox* other);
 
@@ -30,7 +34,9 @@ void Objects_Teardown();
 void Objects_PreTick();
 void Objects_Tick();
 void Objects_Draw();
+void Objects_Clear();
 
+u16  Objects_FindFirstOf(u8 type);
 u16  Objects_Create(u8 type);
 void Objects_Destroy(u16 id);
 

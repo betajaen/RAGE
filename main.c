@@ -9,19 +9,6 @@ u32    COUNTER_FRAME;
 u32    COUNTER_SECOND;
 u16    PLAYER;
 
-typedef enum
-{
-  CTRL_QUIT,
-  CTRL_MOVE_LEFT,
-  CTRL_MOVE_RIGHT,
-  CTRL_MOVE_UP,
-  CTRL_MOVE_DOWN,
-  CTRL_MOVE_JUMP,
-  CTRL_CROUCH,
-  CTRL_HIT,
-  CTRL_BLOCK,
-} Control;
-
 Palette CharacterSrcPalette;
 Palette PlayerPalette;
 Palette EnemyPalette;
@@ -99,6 +86,7 @@ void Init(Settings* settings)
   Input_BindKey(SDL_SCANCODE_H,      CTRL_CROUCH);
   Input_BindKey(SDL_SCANCODE_J,      CTRL_HIT);
   Input_BindKey(SDL_SCANCODE_K,      CTRL_BLOCK);
+  Input_BindKey(SDL_SCANCODE_1,      CTRL_CHEAT);
 
   Level_Load("level1.tmx");
 
@@ -107,14 +95,18 @@ void Init(Settings* settings)
 void Start()
 {
   Objects_Setup();
-  PLAYER = Objects_Create(OT_Player);
 
+  #if 0
   for(int i=0;i < 5;i++)
   {
     u16 enemy = Objects_Create(OT_Enemy);
     Objects_SetPosition(enemy, (320 / 2 + rand() % 320 / 2) * 100, (rand() % 6400));
     Objects_SetTrackingObject(enemy, PLAYER);
   }
+  #endif
+
+  Level_StartSection(0);
+  PLAYER = Objects_FindFirstOf(OT_Player);
 
   Canvas_SetFlags(0, CNF_Clear | CNF_Render, 4);
 }
@@ -202,6 +194,7 @@ void Step()
   Canvas_DrawFilledRectangle(19, Make_Rect2(240, 60, 320, 144));
 #endif
 
+  Level_Tick();
   Level_Draw();
 
   if (nextMovement != 0)
@@ -219,4 +212,10 @@ void Step()
 
   Objects_Draw();
 #endif
+
+  if (Objects_FindFirstOf(OT_Enemy) == 0)
+  {
+    Level_NextSection();
+  }
+
 }
