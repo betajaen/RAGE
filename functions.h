@@ -4,6 +4,8 @@
 #include "data.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 void Init(Settings* settings);
 void Start();
@@ -16,6 +18,9 @@ u8   Animation_LastFrame(u8 animation);
 u8   Animation_Speed(u8 animation);
 bool Animation_IsEnded(u8 frame, u8 ticks, u8 animation);
 void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation);
+
+void Level_Load(const char* name);
+void Level_Draw();
 
 bool Collision_BoxVsBox_Simple(Hitbox* self, Hitbox* other);
 bool Collision_BoxVsBox(HitboxResult* outHit, Hitbox* self, Hitbox* other);

@@ -100,6 +100,7 @@ void Init(Settings* settings)
   Input_BindKey(SDL_SCANCODE_J,      CTRL_HIT);
   Input_BindKey(SDL_SCANCODE_K,      CTRL_BLOCK);
 
+  Level_Load("level1.tmx");
 
 }
 
@@ -111,7 +112,7 @@ void Start()
   for(int i=0;i < 5;i++)
   {
     u16 enemy = Objects_Create(OT_Enemy);
-    Objects_SetPosition(enemy, (100 + rand() % 100) * 100, (rand() % 6400));
+    Objects_SetPosition(enemy, (320 / 2 + rand() % 320 / 2) * 100, (rand() % 6400));
     Objects_SetTrackingObject(enemy, PLAYER);
   }
 
@@ -154,6 +155,7 @@ void Step()
   if (Input_GetActionPressed(CTRL_HIT))
     nextAction |= MA_Hit;
 
+#if 0
   Rect rect;
   rect.left   = 0;
   rect.right  = SCREEN_WIDTH;
@@ -198,7 +200,9 @@ void Step()
   Canvas_DrawFilledRectangle(19, Make_Rect2(0, 40, 160, 144));
   Canvas_DrawFilledRectangle(19, Make_Rect2(160, 80, 240, 144));
   Canvas_DrawFilledRectangle(19, Make_Rect2(240, 60, 320, 144));
+#endif
 
+  Level_Draw();
 
   if (nextMovement != 0)
   {
@@ -209,8 +213,10 @@ void Step()
   {
     Objects_SetMovementAction(PLAYER, nextAction);
   }
-  
-  Objects_Tick();
+
+#if 1
+ Objects_Tick();
 
   Objects_Draw();
+#endif
 }
