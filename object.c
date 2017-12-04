@@ -3,7 +3,7 @@
 #define MAX_OBJECTS 20
 #define SCALE 100
 #define RAGE_TIMER 25
-
+#define RAGE_VUN 14
 
 typedef enum 
 {
@@ -1007,9 +1007,15 @@ static void Object_Tick(Object* object, bool stillScreen)
                 amount = 2;
               }
 
-              if (other->type == OT_Player && other->rage < 12)
+              // Game Mechanic....
+              if (other->type == OT_Player && other->rage < RAGE_VUN)
               {
                 amount = 0;
+                other->rageTimer = RAGE_TIMER;
+              }
+              else if (object->type == OT_Player && other->rage >= RAGE_VUN)
+              {
+                amount *= 2;
               }
 
               i32 hp = (i32)(other->hp) - amount;
