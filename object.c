@@ -134,13 +134,14 @@ static inline bool IsReallyCrouching(Object* object)
 
 
 static void Object_PreTick(Object* object);
-static void Object_Tick(Object* object);
-static void Object_Draw(Object* object);
+static void Object_Tick(Object* object, bool stillScreen);
+static void Object_Draw(Object* object, i32 xOffset);
 static void Object_Initialise(Object* object, u8 type);
 static void Object_Clear(Object* object);
 static void Object_SetMoveDelta(Object* object, u8 moveVector);
 static void Object_SetMoveAction(Object* object, u8 moveAction);
 static void Object_SetPosition(Object* object, i32 x, u16 y);
+static void Object_ModPosition(Object* object);
 
 void GroupEnemyObject_Tick();
 
@@ -186,6 +187,18 @@ void Objects_Clear()
   }
 }
 
+void Objects_ClearExcept(u8 type)
+{
+  for (int i = 0; i < MAX_OBJECTS; i++)
+  {
+    Object* object = &sObjects[i];
+    if (object->type != type)
+    {
+      Object_Clear(object);
+    }
+  }
+}
+
 u16  Objects_FindFirstOf(u8 type)
 {
   for (int i = 0; i < MAX_OBJECTS; i++)
@@ -218,14 +231,14 @@ void Objects_PreTick()
   GroupEnemyObject_Tick();
 }
 
-void Objects_Tick()
+void Objects_Tick(bool stillScreen)
 {
   for(int i=0;i < MAX_OBJECTS;i++)
   {
     Object* object = &sObjects[i];
     if (object->type != 0)
     {
-      Object_Tick(object);
+      Object_Tick(object, stillScreen);
     }
   }
 
@@ -261,7 +274,7 @@ void Objects_Tick()
 
 }
 
-void Objects_Draw()
+void Objects_Draw(i32 xOffset)
 {
 #if 0
   for (int i = 0; i < MAX_OBJECTS; i++)
@@ -269,7 +282,7 @@ void Objects_Draw()
     Object* object = &sObjects[i];
     if (object->type != 0)
     {
-      Object_Draw(object);
+      Object_Draw(object, xOffset);
     }
   }
 #else
@@ -279,7 +292,7 @@ void Objects_Draw()
     while(head != 0)
     {
       Object* obj = &sObjects[head - 1];
-      Object_Draw(obj);
+      Object_Draw(obj, xOffset);
       head = obj->nextDrawId;
     }
   }
@@ -291,6 +304,14 @@ void Objects_SetPosition(u16 id, i32 x, u16 y)
   if (id != 0)
   {
     Object_SetPosition(&sObjects[id - 1], x, y);
+  }
+}
+
+void Objects_ModPosition(u16 id)
+{
+  if (id != 0)
+  {
+    Object_ModPosition(&sObjects[id - 1]);
   }
 }
 
@@ -317,6 +338,20 @@ void Objects_SetTrackingObject(u16 id, u16 other)
     Object* object = &sObjects[id - 1];
     object->trackingObject = other;
     object->trackingTimer = 8;
+  }
+}
+
+void Objects_SetTrackingObjectType(u8 type, u16 other)
+{
+  for(int i=0;i < MAX_OBJECTS;i++)
+  {
+    Object* object = &sObjects[i];
+
+    if (object->bIsDead == false && object->type == type)
+    {
+      object->trackingObject = other;
+      object->trackingTimer = 8;
+    }
   }
 }
 
@@ -614,7 +649,7 @@ static void MoveFlags2Acceleration(Object* object)
   }
 }
 
-static void Object_Tick(Object* object)
+static void Object_Tick(Object* object, bool stillScreen)
 {
 
   i16 velocityX = object->velocityX;
@@ -624,7 +659,27 @@ static void Object_Tick(Object* object)
   object->accelerationX = 0;
   object->accelerationY = 0;
 
-  if (!object->bIsDead)
+  if (object->type == OT_Player && !stillScreen)
+  {
+    if (object->frameAnimation != ANIM_Walk)
+      Object_ResetAnim(object, ANIM_Walk);
+
+    object->bIsBlocking = false;
+    object->bIsCrouched = false;
+    object->bIsHitting = false;
+    object->bIsDazed = false;
+    object->moveFlags = 0;
+    //object->bDirection = 1;
+
+    if (object->x <= (100 * 10))
+    {
+      object->moveFlags |= MV_Right;
+    }
+
+    MoveFlags2Acceleration(object);
+  }
+
+  if (stillScreen && !object->bIsDead)
   {
     if (object->lastDamageTime > 0)
     {
@@ -838,83 +893,86 @@ static void Object_Tick(Object* object)
     object->boundsHit.y1 = object->bounds.y0 + 100 * 29;
   }
 
-  if (!object->bIsDead && 
-      object->bIsHitting && object->hitState == 1)
+  if (stillScreen)
   {
-    for(u16 i=0;i < MAX_OBJECTS;i++)
+    if (!object->bIsDead && 
+        object->bIsHitting && object->hitState == 1)
     {
-      Object* other = &sObjects[i];
-      if (other == object)
-        continue;
-      if (other->type == OT_None)
-        continue;
-      if (other->bIsDead)
-        continue;
-
-      i32 x1 = 0;
-      
-      if (object->bDirection == 1)
-        x1 = object->boundsHit.x1;
-      else
-        x1 = object->boundsHit.x0;
-
-      i32 y0 = object->boundsHit.y0;
-      i32 y1 = object->boundsHit.y1;
-
-      if (Collision_BoxVsBox_Simple(&object->boundsHit, &other->bounds))
+      for(u16 i=0;i < MAX_OBJECTS;i++)
       {
-        object->hitState = 2;
+        Object* other = &sObjects[i];
+        if (other == object)
+          continue;
+        if (other->type == OT_None)
+          continue;
+        if (other->bIsDead)
+          continue;
 
-        if (other->bIsBeingDamaged == false)
+        i32 x1 = 0;
+      
+        if (object->bDirection == 1)
+          x1 = object->boundsHit.x1;
+        else
+          x1 = object->boundsHit.x0;
+
+        i32 y0 = object->boundsHit.y0;
+        i32 y1 = object->boundsHit.y1;
+
+        if (Collision_BoxVsBox_Simple(&object->boundsHit, &other->bounds))
         {
+          object->hitState = 2;
 
-          other->bAiStayDistance = 0;
-
-          other->damageTimer = 8;
-          other->bIsBeingDamaged = 1;
-          if (object->bDirection == 1)
-            other->bDirection = 0;
-          else
-            other->bDirection = 1;
-          
-          if (other->hp > 0)
+          if (other->bIsBeingDamaged == false)
           {
-            int amount = 1;
 
-            if (other->bIsDazed)
+            other->bAiStayDistance = 0;
+
+            other->damageTimer = 8;
+            other->bIsBeingDamaged = 1;
+            if (object->bDirection == 1)
+              other->bDirection = 0;
+            else
+              other->bDirection = 1;
+          
+            if (other->hp > 0)
             {
-              amount = 2;
+              int amount = 1;
+
+              if (other->bIsDazed)
+              {
+                amount = 2;
+              }
+
+              i32 hp = (i32)(other->hp) - amount;
+              if (hp < 0)
+                hp = 0;
+              other->hp = hp;
+
             }
-
-            i32 hp = (i32)(other->hp) - amount;
-            if (hp < 0)
-              hp = 0;
-            other->hp = hp;
-
+            Object_ResetAnim(other, ANIM_StandHit);
+            printf("** Damage Begin\n");
+            break;
           }
-          Object_ResetAnim(other, ANIM_StandHit);
-          printf("** Damage Begin\n");
-          break;
         }
       }
     }
-  }
 
-  if (object->bIsDead     == false &&
-      object->bIsBlocking == false && 
-      object->bIsCrouched == false && 
-      object->bIsHitting  == false &&
-      object->bIsBeingDamaged == false)
-  {
-    if (!wasMoving && IsMoving(object))
+    if (object->bIsDead     == false &&
+        object->bIsBlocking == false && 
+        object->bIsCrouched == false && 
+        object->bIsHitting  == false &&
+        object->bIsBeingDamaged == false)
     {
-      Object_ResetAnim(object, ANIM_Walk);
-      printf("** Walk\n");
-    }
-    else if (wasMoving && !IsMoving(object))
-    {
-      Object_ResetAnim(object, ANIM_Stand);
-      printf("** Stand\n");
+      if (!wasMoving && IsMoving(object))
+      {
+        Object_ResetAnim(object, ANIM_Walk);
+        printf("** Walk\n");
+      }
+      else if (wasMoving && !IsMoving(object))
+      {
+        Object_ResetAnim(object, ANIM_Stand);
+        printf("** Stand\n");
+      }
     }
   }
 
@@ -924,7 +982,7 @@ static void Object_Tick(Object* object)
 
   if (object->type == OT_Player)
   {
-    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
+    Canvas_PrintF(0, 0, &FONT_NEOSANS, 3, "%i %i S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->x / 100, object->y / 100, object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
   }
 }
 
@@ -947,6 +1005,11 @@ static void Object_SetPosition(Object* object, i32 x, u16 y)
 {
   object->x = x;
   object->y = y;
+}
+
+static void Object_ModPosition(Object* object)
+{
+  object->x -= (320 * 100);
 }
 
 static void Object_SetMoveDelta(Object* object, u8 moveVector)
@@ -976,16 +1039,21 @@ static void Object_SetMoveAction(Object* object, u8 moveAction)
 
 }
 
-static void Object_Draw(Object* object)
+static void Object_Draw(Object* object, i32 xOffset)
 {
   
+  int x = 0;
+  if (xOffset == 0) //|| (xOffset != 0 && object->type == OT_Player))
+    x = object->sx;
+  else if (xOffset != 0)
+    x = 320 - xOffset + object->sx;
 
-  Draw_Animation(object->sx, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection, object->frameDepth);
+  Draw_Animation(x, object->sy - CHARACTER_FRAME_H, object->type, object->frameAnimation, object->frameCurrent, object->bDirection, object->frameDepth);
 
   if (object->bAiIsHead == 1)
   {
     Rect rect;
-    rect.left   = object->sx;
+    rect.left   = x;
     rect.top    = object->sy;
     rect.right  = rect.left + 2;
     rect.bottom = rect.top + 2;

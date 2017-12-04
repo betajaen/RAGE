@@ -14,6 +14,10 @@ Palette PlayerPalette;
 Palette EnemyPalette;
 Palette CorpsePalette;
 
+int levelState  = 0;
+int levelTimer  = 0;
+int levelOffset = 0;
+
 inline Colour Make_RGB(u8 r, u8 g, u8 b)
 {
   Colour c = { r, g, b};
@@ -107,8 +111,11 @@ void Start()
 
   Level_StartSection(0);
   PLAYER = Objects_FindFirstOf(OT_Player);
+  Objects_SetTrackingObjectType(OT_Enemy, PLAYER);
 
   Canvas_SetFlags(0, CNF_Clear | CNF_Render, 4);
+  levelState = 1;
+  levelTimer = 0;
 }
 
 void Step()
@@ -194,9 +201,6 @@ void Step()
   Canvas_DrawFilledRectangle(19, Make_Rect2(240, 60, 320, 144));
 #endif
 
-  Level_Tick();
-  Level_Draw();
-
   if (nextMovement != 0)
   {
     Objects_SetMovementVector(PLAYER, nextMovement);
@@ -207,15 +211,36 @@ void Step()
     Objects_SetMovementAction(PLAYER, nextAction);
   }
 
-#if 1
- Objects_Tick();
+  if (levelState == 0)
+  {
+    levelOffset += 4;
+    levelTimer++;
 
-  Objects_Draw();
-#endif
+    Level_Draw(levelOffset);
+    Objects_Tick(false);
+    Objects_Draw(levelOffset);
 
-  if (Objects_FindFirstOf(OT_Enemy) == 0)
+    if (levelOffset == 320)
+    {
+      levelState = 1;
+    }
+  }
+  else
+  {
+    Level_Draw(0);
+    Objects_Tick(true);
+    Objects_Draw(0);
+  }
+
+  if ( Objects_FindFirstOf(OT_Enemy) == 0 || Input_GetActionPressed(CTRL_CHEAT))
   {
     Level_NextSection();
+    PLAYER = Objects_FindFirstOf(OT_Player);
+    Objects_SetTrackingObjectType(OT_Enemy, PLAYER);
+    Objects_ModPosition(PLAYER);
+    levelState = 0;
+    levelOffset = 0;
+    levelTimer = 0;
   }
 
 }

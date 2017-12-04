@@ -187,19 +187,20 @@ void Level_Load(const char* t)
 
 }
 
-void Level_Draw()
+static void DrawLevel(Section* section, i32 xOffset)
 {
-  Section* section = &sLevel.sections[sLevel.currentSection];
 
   SDL_Rect src, dst;
+  // Tiles
+
   src.w = TILE_SIZE;
   src.h = TILE_SIZE;
   dst.w = src.w;
   dst.h = src.h;
 
-  for(u32 i=0;i < SECTION_W;i++)
+  for (u32 i = 0; i < SECTION_W; i++)
   {
-    for(u32 j=0;j < SECTION_H;j++)
+    for (u32 j = 0; j < SECTION_H; j++)
     {
       u32 x = i * TILE_SIZE;
       u32 y = j * TILE_SIZE;
@@ -209,7 +210,7 @@ void Level_Draw()
 
       src.x = tx;
       src.y = ty;
-      dst.x = x;
+      dst.x = x + xOffset;
       dst.y = y;
 
       Canvas_Splat3(&SPRITESHEET, &dst, &src);
@@ -217,12 +218,47 @@ void Level_Draw()
   }
 }
 
+void Level_Draw(i32 offsetX)
+{
+  SDL_Rect src, dst;
+
+  // Background Sky
+  src.x = 416;
+  src.y = 16;
+  src.w = 80;
+  src.h = 128;
+
+  dst.y = 0;
+  dst.w = src.w;
+  dst.h = src.h;
+
+  for (int i = 0; i < (320 / 80); i++)
+  {
+    dst.x = i * 80;
+    Canvas_Splat3(&SPRITESHEET, &dst, &src);
+  }
+
+  if (offsetX != 0)
+  {
+    Section* sectionLast = &sLevel.sections[sLevel.currentSection - 1];
+    DrawLevel(sectionLast, -offsetX);
+    Section* section = &sLevel.sections[sLevel.currentSection];
+    DrawLevel(section, 320 - offsetX);
+  }
+  else
+  {
+    Section* section = &sLevel.sections[sLevel.currentSection];
+    DrawLevel(section, 0);
+  }
+}
+
+
 void Level_StartSection(u8 sectionIdx)
 {
   sLevel.currentSection = sectionIdx;
   Section* section = &sLevel.sections[sectionIdx];
 
-  Objects_Clear();
+  Objects_ClearExcept(OT_Player);
 
   for(u32 i=0;i < section->numObjects;i++)
   {
@@ -232,7 +268,10 @@ void Level_StartSection(u8 sectionIdx)
     {
       case 3:
       {
-        id = Objects_Create(OT_Player);
+        if (sectionIdx == 0)
+        {
+          id = Objects_Create(OT_Player);
+        }
       }
       break;
       case 4:
@@ -267,12 +306,4 @@ void Level_NextSection()
     Level_StartSection(0);
   else
     Level_StartSection(next);
-}
-
-void Level_Tick()
-{
-  if (Input_GetActionPressed(CTRL_CHEAT))
-  {
-    sLevel.currentSection++;
-  }
 }
