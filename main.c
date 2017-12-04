@@ -20,6 +20,13 @@ int levelState  = 0;
 int levelTimer  = 0;
 int levelOffset = 0;
 
+void Title();
+void Game();
+void StartGame();
+void Win();
+
+u8 mode = 0;
+
 inline Colour Make_RGB(u8 r, u8 g, u8 b)
 {
   Colour c = { r, g, b};
@@ -108,29 +115,101 @@ void Init(Settings* settings)
   Input_BindKey(SDL_SCANCODE_A,      CTRL_MOVE_LEFT);
   Input_BindKey(SDL_SCANCODE_D,      CTRL_MOVE_RIGHT);
   Input_BindKey(SDL_SCANCODE_SPACE,  CTRL_MOVE_JUMP);
-  Input_BindKey(SDL_SCANCODE_H,      CTRL_CROUCH);
+  //Input_BindKey(SDL_SCANCODE_H,      CTRL_CROUCH);
   Input_BindKey(SDL_SCANCODE_J,      CTRL_HIT);
   Input_BindKey(SDL_SCANCODE_K,      CTRL_BLOCK);
   Input_BindKey(SDL_SCANCODE_1,      CTRL_CHEAT);
+  Input_BindKey(SDL_SCANCODE_M,      CTRL_MUSIC);
 
   Level_Load("level1.tmx");
+
+  Music_Play("rage.mod");
 
 }
 
 void Start()
 {
-  Objects_Setup();
+}
 
-  #if 0
-  for(int i=0;i < 5;i++)
+void Step()
+{
+  COUNTER_FRAME++;
+
+  if (COUNTER_FRAME == 30)
   {
-    u16 enemy = Objects_Create(OT_Enemy);
-    Objects_SetPosition(enemy, (320 / 2 + rand() % 320 / 2) * 100, (rand() % 6400));
-    Objects_SetTrackingObject(enemy, PLAYER);
+    COUNTER_FRAME = 0;
+    COUNTER_SECOND++;
   }
-  #endif
 
-  Level_StartSection(0);
+  if (mode == 0)
+    Title();
+  else if (mode == 1)
+    Game();
+  else if (mode == 2)
+    Win();
+}
+
+void Title()
+{
+  SDL_Rect src, dst;
+  src.w = 128;
+  src.h = 128;
+  src.x = 288;
+  src.y = 0;
+
+  dst.x = 320 / 2 - 128 / 2;
+  dst.y = (214 / 2 - 128 / 2);
+  dst.w = 128;
+  dst.h = 128;
+
+  Level_Splat(0);
+
+  Canvas_Splat3(&SPRITESHEET, &dst, &src);
+
+  if (COUNTER_FRAME >= 15)
+  {
+    Canvas_PrintStr(80+1, 180+1, &FONT_KAGESANS, 5, "PRESS [S] TO PLAY");
+    Canvas_PrintStr(80, 180, &FONT_KAGESANS, 3, "PRESS [S] TO PLAY");
+  }
+
+  if (Input_GetActionReleased(CTRL_MOVE_DOWN))
+  {
+    StartGame();
+  }
+
+}
+
+void Win()
+{
+  SDL_Rect src, dst;
+  src.w = 128;
+  src.h = 128;
+  src.x = 288;
+  src.y = 0;
+
+  dst.x = 320 / 2 - 128 / 2;
+  dst.y = (214 / 2 - 128 / 2);
+  dst.w = 128;
+  dst.h = 128;
+
+  Level_Splat(0);
+
+  Canvas_Splat3(&SPRITESHEET, &dst, &src);
+
+  if (COUNTER_FRAME >= 8)
+  {
+    Canvas_PrintStr(40 + 1, 180 + 1, &FONT_KAGESANS, 5, "CONGRATULATIONS YOU WON!!");
+    Canvas_PrintStr(40, 180, &FONT_KAGESANS, 3, "CONGRATULATIONS YOU WON!!");
+  }
+
+}
+
+void StartGame()
+{
+  mode = 1;
+
+  Objects_Setup();
+  Level_StartSection(1);
   PLAYER = Objects_FindFirstOf(OT_Player);
   Objects_SetTrackingObjectType(OT_Enemy, PLAYER);
 
@@ -139,15 +218,8 @@ void Start()
   levelTimer = 0;
 }
 
-void Step()
+void Game()
 {
-  COUNTER_FRAME++;
-
-  if (COUNTER_SECOND == 30)
-  {
-    COUNTER_FRAME = 0;
-    COUNTER_SECOND++;
-  }
 
   if (Objects_FindFirstOf(OT_Player) == 0)
   {
@@ -176,8 +248,8 @@ void Step()
   //if (Input_GetActionReleased(CTRL_HIT))
   //  nextAction = MA_Hit;
   //else 
-  if (Input_GetActionDown(CTRL_CROUCH))
-    nextAction |= MA_Crouch;
+  //if (Input_GetActionDown(CTRL_CROUCH))
+ //   nextAction |= MA_Crouch;
   if (Input_GetActionDown(CTRL_BLOCK))
     nextAction |= MA_Block;
   if (Input_GetActionPressed(CTRL_HIT))
@@ -265,7 +337,12 @@ void Step()
   if ( Objects_FindFirstOf(OT_Enemy) == 0)
   {
     Objects_ModPositions();
-    Level_NextSection();
+    if (Level_NextSection() == false)
+    {
+      mode = 2;
+      return;
+    }
+
     PLAYER = Objects_FindFirstOf(OT_Player);
     Objects_SetTrackingObjectType(OT_Enemy, PLAYER);
     levelState = 0;
@@ -275,7 +352,13 @@ void Step()
 
   if (Input_GetActionReleased(CTRL_CHEAT))
   {
-    Objects_KO(OT_Enemy);
+    //Objects_Heal(OT_Player);
+    //Objects_KO(OT_Enemy);
+  }
+
+  if (Input_GetActionReleased(CTRL_MUSIC))
+  {
+    Music_PauseToggle();
   }
 
 }

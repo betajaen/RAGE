@@ -20,11 +20,13 @@ AnimationInfo kAnimationInfos[] = {
   {32, 48, 3, AS_Once, 1,  0,   48, 0 },  // ANIM_CrouchUp
   {32, 48, 1, AS_Once, 1,  224, 48, 1 },  // ANIM_StandBlock
   {32, 48, 1, AS_Once, 1,  224, 96, 1 },  // ANIM_CrouchBlock
-  {32, 48, 2, AS_Once, 3,  0,   96, 1 },  // ANIM_StandPunch
-  {32, 48, 2, AS_Once, 3,  64,  96, 1 },  // ANIM_CrouchPunch
   {32, 48, 2, AS_Once, 4,  0,  144, 1 },  // ANIM_StandHit
   {32, 48, 2, AS_Once, 4,  64, 144, 1 },  // ANIM_CrouchHit
   {48, 48, 2, AS_Once, 4,  0,  192, 1 },  // ANIM_Death
+  { 32, 48, 2, AS_Once, 3,  64,  96, 1 },  // ANIM_CrouchPunch
+  { 32, 48, 2, AS_Once, 3,  0,   96, 1 },  // ANIM_StandPunch
+  { 32, 48, 3, AS_Once, 3,  0,  240, 1 },  // ANIM_StandPunch2
+  { 32, 48, 4, AS_Once, 3,  0,  288, 1 },  // ANIM_StandPunch3
 };
 
 static const u8 kAnimationCount = sizeof(kAnimationInfos) / sizeof(AnimationInfo);

@@ -62,11 +62,13 @@ typedef enum
   ANIM_CrouchUp    = 4,
   ANIM_StandBlock  = 5,
   ANIM_CrouchBlock = 6,
-  ANIM_StandPunch  = 7,
-  ANIM_CrouchPunch = 8,
-  ANIM_StandHit    = 9,
-  ANIM_CrouchHit   = 10,
-  ANIM_Death       = 11
+  ANIM_StandHit    = 7,
+  ANIM_CrouchHit   = 8,
+  ANIM_Death       = 9,
+  ANIM_CrouchPunch = 10,
+  ANIM_StandPunch  = 11,
+  ANIM_StandPunch2 = 12,
+  ANIM_StandPunch3 = 13,
 } AnimationType;
 
 typedef enum
@@ -87,7 +89,8 @@ typedef enum
   CTRL_CROUCH,
   CTRL_HIT,
   CTRL_BLOCK,
-  CTRL_CHEAT
+  CTRL_CHEAT,
+  CTRL_MUSIC
 } Control;
 
 typedef struct

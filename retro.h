@@ -392,6 +392,8 @@ void  Music_Play(const char* name);
 
 void  Music_Stop();
 
+void  Music_PauseToggle();
+
 void  Palette_Make(Palette* palette);
 
 void  Palette_SetDefault(const Palette* palette);

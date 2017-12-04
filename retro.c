@@ -117,6 +117,7 @@ float                 gFps;
 SoundDevice           gSoundDevice;
 SoundObject           gSoundObject[RETRO_MAX_SOUND_OBJECTS];
 micromod_sdl_context* gMusicContext;
+bool                  gMusicPaused;
 #ifdef RETRO_BROWSER
 u8*                   gMusicFileData;
 #endif
@@ -1433,6 +1434,7 @@ void Music_Play(const char* name)
 
   gMusicContext = malloc(sizeof(micromod_sdl_context));
   memset(gMusicContext, 0, sizeof(micromod_sdl_context));
+  gMusicPaused = false;
 
   void* data = NULL;
   u32 dataLength = 0;
@@ -1461,6 +1463,17 @@ void Music_Play(const char* name)
 
 }
 
+void Music_PauseToggle()
+{
+
+  if (gMusicContext == NULL)
+  {
+    return;
+  }
+
+  gMusicPaused = !gMusicPaused;
+}
+
 void Music_Stop()
 {
   if (gMusicContext == NULL)
@@ -1481,7 +1494,7 @@ void Retro_SDL_SoundCallback(void* userdata, u8* stream, int streamLength)
 {
   SDL_memset(stream, 0, streamLength);
 
-  if (gMusicContext != NULL)
+  if (gMusicContext != NULL && gMusicPaused == false)
   {
 
     // int uSize = (gSoundDevice.specification.format == AUDIO_S16 ? sizeof(short) : sizeof(float));
@@ -1505,9 +1518,9 @@ void Retro_SDL_SoundCallback(void* userdata, u8* stream, int streamLength)
       micromod_get_audio( gMusicContext->mix_buffer, count );
       
       if (gSoundDevice.specification.format == AUDIO_S16)
-        micromod_sdl_downsample( gMusicContext, gMusicContext->mix_buffer, (short *) stream, count );
+        micromod_sdl_downsample( gMusicContext, gMusicContext->mix_buffer, (short *) stream, count, 4);
       else
-        micromod_sdl_downsample_float( gMusicContext, gMusicContext->mix_buffer, (float*) stream, count);
+        micromod_sdl_downsample_float( gMusicContext, gMusicContext->mix_buffer, (float*) stream, count, 0.25f);
       
       gMusicContext->samples_remaining -= count;
     }
@@ -1617,7 +1630,7 @@ void Font_Load(const char* name, Font* outFont, Colour markerColour, Colour tran
     }
   }
 
-  outFont->widths[' '] = outFont->widths['e'];
+  outFont->widths[' '] = outFont->widths['M'];
 
   // Copy rest of image into the texture.
   for(i=0, j=width * 3;i < width * (height - 1) * 4;i+=4, j+=3)

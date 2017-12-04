@@ -22,10 +22,11 @@ void Animation_NextFrame(u8* ticks, u8* frame, u8* ended, u8 animation);
 void Level_Load(const char* name);
 
 void Level_Draw(i32 offset);
+void Level_Splat(u8 level);
 
 void Level_StartSection(u8 sectionIdx);
 void Level_PrevSection();
-void Level_NextSection();
+bool Level_NextSection();
 void Level_PostNextSection();
 
 void Sound_PlayHit();
@@ -46,6 +47,7 @@ u16  Objects_Create(u8 type, u8 section);
 void Objects_Destroy(u16 id);
 void Objects_DestroySection(u8 section);
 void Objects_KO(u8 type);
+void Objects_Heal(u8 type);
 
 void Objects_SetTrackingObject(u16 id, u16 other);
 void Objects_SetTrackingObjectType(u8 type, u16 other);

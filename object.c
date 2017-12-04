@@ -60,6 +60,7 @@ typedef struct
   u32 bIsBeingDamaged            : 1;
   u32 bIsDead                    : 1;
   u32 bIsDazed                   : 1;
+  u32 bIsAnimating               : 1;
   u32 bAiIsHead                  : 1;
   u32 bAiStayDistance            : 1;
   u32 bFrameAnimationEnded       : 1;
@@ -137,16 +138,16 @@ static inline bool IsReallyCrouching(Object* object)
 }
 
 
-static void Object_PreTick(Object* object);
-static void Object_Tick(Object* object, bool stillScreen);
-static void Object_Draw(Object* object, i32 xOffset);
-static void Object_Initialise(Object* object, u8 type, u8 section);
-static void Object_Clear(Object* object);
-static void Object_SetMoveDelta(Object* object, u8 moveVector);
-static void Object_SetMoveAction(Object* object, u8 moveAction);
-static void Object_SetPosition(Object* object, i32 x, u16 y);
-static void Object_ModPosition(Object* object);
-static void Object_ResetAnim(Object* object, u8 anim);
+void Object_PreTick(Object* object);
+void Object_Tick(Object* object, bool stillScreen);
+void Object_Draw(Object* object, i32 xOffset);
+void Object_Initialise(Object* object, u8 type, u8 section);
+void Object_Clear(Object* object);
+void Object_SetMoveDelta(Object* object, u8 moveVector);
+void Object_SetMoveAction(Object* object, u8 moveAction);
+void Object_SetPosition(Object* object, i32 x, u16 y);
+void Object_ModPosition(Object* object);
+void Object_ResetAnim(Object* object, u8 anim);
 
 void GroupEnemyObject_Tick();
 
@@ -204,6 +205,13 @@ void Object_KO(Object* object)
   object->bAiIsHead = 0;
 }
 
+void Object_Heal(Object* object)
+{
+  object->hp = 4;
+  object->rage = 0;
+  object->rageTimer = RAGE_TIMER;
+}
+
 void Objects_KO(u8 type)
 {
   for (int i = 0; i < MAX_OBJECTS; i++)
@@ -212,6 +220,18 @@ void Objects_KO(u8 type)
     if (object->type == type)
     {
       Object_KO(object);
+    }
+  }
+}
+
+void Objects_Heal(u8 type)
+{
+  for (int i = 0; i < MAX_OBJECTS; i++)
+  {
+    Object* object = &sObjects[i];
+    if (object->type == type)
+    {
+      Object_Heal(object);
     }
   }
 }
@@ -398,7 +418,7 @@ void Objects_SetTrackingObjectType(u8 type, u16 other)
   }
 }
 
-static void Object_ResetAnim(Object* object, u8 anim)
+void Object_ResetAnim(Object* object, u8 anim)
 {
   object->frameAnimation = anim;
   object->frameCurrent = Animation_FirstFrame(anim);
@@ -406,7 +426,7 @@ static void Object_ResetAnim(Object* object, u8 anim)
   object->bFrameAnimationEnded = 0;
 }
 
-static void Object_ResetAnimEnd(Object* object, u8 anim)
+void Object_ResetAnimEnd(Object* object, u8 anim)
 {
   object->frameAnimation = anim;
   object->frameCurrent = Animation_LastFrame(anim);
@@ -437,7 +457,7 @@ i32 SolveVelocity(i32 velocity, i32 acceleration, i32 drag, i32 maxVelocity)
   return velocity;
 }
 
-static void GroupEnemyObject_Tick()
+void GroupEnemyObject_Tick()
 {
   // See if there is a head, if not. Assign first.
   // Others should tick down and move to a random spot around target.
@@ -558,7 +578,7 @@ static inline MovementVector MaybeOpposite(bool cond, MovementVector dt)
   return dt;
 }
 
-static void PlayerObject_Tick(Object* object)
+void PlayerObject_Tick(Object* object)
 {
   if (object->rage > 0)
   {
@@ -569,7 +589,6 @@ static void PlayerObject_Tick(Object* object)
 
     if (object->bIsBlocking == false && object->bIsCrouched)
     {
-
       object->rageTimer--;
       if (object->rageTimer == 0)
       {
@@ -580,7 +599,7 @@ static void PlayerObject_Tick(Object* object)
   }
 }
 
-static void EnemyObject_Tick(Object* object)
+void EnemyObject_Tick(Object* object)
 {
 
   if (object->trackingObject != 0)
@@ -685,7 +704,7 @@ static void EnemyObject_Tick(Object* object)
   }
 }
 
-static void MoveFlags2Acceleration(Object* object)
+void MoveFlags2Acceleration(Object* object)
 {
   if (CanMoveForAcceleration(object) == false)
     return;
@@ -711,7 +730,7 @@ static void MoveFlags2Acceleration(Object* object)
   }
 }
 
-static void Object_Tick(Object* object, bool stillScreen)
+void Object_Tick(Object* object, bool stillScreen)
 {
 
   i16 velocityX = object->velocityX;
@@ -723,19 +742,46 @@ static void Object_Tick(Object* object, bool stillScreen)
 
   if (object->type == OT_Player && !stillScreen)
   {
-    if (object->frameAnimation != ANIM_Walk)
-      Object_ResetAnim(object, ANIM_Walk);
-
     object->bIsBlocking = false;
     object->bIsCrouched = false;
     object->bIsHitting = false;
     object->bIsDazed = false;
+    object->bIsAnimating = true;
     object->moveFlags = 0;
-    //object->bDirection = 1;
 
+    if (object->rageTimer > 0)
+    {
+      object->rageTimer--;
+
+      if (object->rageTimer == 0)
+      {
+        if (object->rage > 0)
+        {
+          object->rage--;
+        }
+
+        object->rageTimer = 10;
+      }
+    }
+
+    wasMoving = true;
+
+    // printf("** Animate\n");
+    
     if (object->x <= (100 * 10))
     {
+      if (object->frameAnimation != ANIM_Walk)
+        Object_ResetAnim(object, ANIM_Walk);
+
       object->moveFlags |= MV_Right;
+    }
+    else
+    {
+      if (object->frameAnimation != ANIM_Stand)
+        Object_ResetAnim(object, ANIM_Stand);;
+      object->velocityX = 0;
+      object->velocityY = 0;
+      object->bIsAnimating = false;
     }
 
     MoveFlags2Acceleration(object);
@@ -770,7 +816,7 @@ static void Object_Tick(Object* object, bool stillScreen)
         if (object->hp == 0)
         {
           Object_KO(object);
-          printf("** DEAD!\n");
+          // printf("** DEAD!\n");
         }
         else
         {
@@ -779,7 +825,7 @@ static void Object_Tick(Object* object, bool stillScreen)
           Object_ResetAnim(object, ANIM_Stand);
         }
 
-        printf("** Damage End %i\n", object->hp);
+        // printf("** Damage End %i\n", object->hp);
       }
       else
       {
@@ -811,7 +857,7 @@ static void Object_Tick(Object* object, bool stillScreen)
               object->velocityY = 0;
 
 
-              printf("** Down\n");
+              // printf("** Down\n");
             }
           }
         }
@@ -832,7 +878,7 @@ static void Object_Tick(Object* object, bool stillScreen)
             Object_ResetAnim(object, ANIM_Stand);
             object->moveState = MS_Walk;
 
-            printf("** Up\n");
+            // printf("** Up\n");
           }
         }
       }
@@ -849,13 +895,13 @@ static void Object_Tick(Object* object, bool stillScreen)
           {
             Object_ResetAnim(object, ANIM_CrouchBlock);
 
-            printf("** Block Crouch\n");
+            // printf("** Block Crouch\n");
           }
           else
           {
             Object_ResetAnim(object, ANIM_StandBlock);
 
-            printf("** Block Stand\n");
+            // printf("** Block Stand\n");
           }
         }
       }
@@ -867,12 +913,12 @@ static void Object_Tick(Object* object, bool stillScreen)
           {
             Object_ResetAnimEnd(object, ANIM_CrouchDown);
 
-            printf("** Block End Crouch\n");
+            // printf("** Block End Crouch\n");
           }
           else
           {
             Object_ResetAnim(object, ANIM_Stand);
-            printf("** Block End Stand\n");
+            // printf("** Block End Stand\n");
           }
         }
       }
@@ -885,11 +931,32 @@ static void Object_Tick(Object* object, bool stillScreen)
           if (object->bIsCrouched)
             Object_ResetAnim(object, ANIM_CrouchPunch);
           else
-            Object_ResetAnim(object, ANIM_StandPunch);
+          {
+            u32 r = rand() % 10;
+            switch(r)
+            {
+              case 0:
+              case 1:
+              case 2:
+              case 3:
+              case 4:
+              case 5:
+                Object_ResetAnim(object, ANIM_StandPunch);
+              break;
+              case 6:
+              case 7:
+              case 8:
+                Object_ResetAnim(object, ANIM_StandPunch2);
+                break;
+              case 9:
+              case 10:
+                Object_ResetAnim(object, ANIM_StandPunch3);
+              break;
+            }
+          }
           object->hitState++;
 
-          printf("** Hit Begin\n");
-
+          // printf("** Hit Begin\n");
         }
         else if (object->hitState >= 2 || (object->hitState == 1 && object->type == OT_Player))
         {
@@ -898,7 +965,7 @@ static void Object_Tick(Object* object, bool stillScreen)
             object->bIsHitting = false;
             object->hitState = 0;
 
-            printf("** Hit End\n");
+            // printf("** Hit End\n");
 
             if (object->bIsCrouched)
               Object_ResetAnimEnd(object, ANIM_CrouchDown);
@@ -989,7 +1056,7 @@ static void Object_Tick(Object* object, bool stillScreen)
         if (Collision_BoxVsBox_Simple(&object->aiDetection, &other->bounds))
         {
           object->hitState++;
-          object->aiHitTimer = 16;
+          object->aiHitTimer = 12;
 
           if (other->bIsBeingDamaged == false && other->bIsBlocking == false)
           {
@@ -1026,7 +1093,7 @@ static void Object_Tick(Object* object, bool stillScreen)
               }
               else if (object->type == OT_Player && other->rage >= RAGE_VUN)
               {
-                amount *= 2;
+                amount = 3;
               }
 
               i32 hp = (i32)(other->hp) - amount;
@@ -1037,7 +1104,15 @@ static void Object_Tick(Object* object, bool stillScreen)
               Sound_PlayHit();
             }
             Object_ResetAnim(other, ANIM_StandHit);
-            printf("** Damage Begin\n");
+            // printf("** Damage Begin\n");
+          }
+
+          if (other->bIsBlocking)
+          {
+            if (rand() % 20 == 8 && other->rage)
+            {
+              other->rage--;
+            }
           }
         }
         break;
@@ -1050,17 +1125,18 @@ static void Object_Tick(Object* object, bool stillScreen)
         object->bIsHitting  == false &&
         object->bIsBeingDamaged == false)
     {
-      if (!wasMoving && IsMoving(object))
-      {
-        Object_ResetAnim(object, ANIM_Walk);
-        printf("** Walk\n");
-      }
-      else if (wasMoving && !IsMoving(object))
+      if (wasMoving && !IsMoving(object))
       {
         Object_ResetAnim(object, ANIM_Stand);
-        printf("** Stand\n");
+        // printf("** Stand\n");
+      }
+      else if (!wasMoving && IsMoving(object))
+      {
+        Object_ResetAnim(object, ANIM_Walk);
+        // printf("** Walk\n");
       }
     }
+
   }
 
   u8 ended = 0;
@@ -1069,13 +1145,13 @@ static void Object_Tick(Object* object, bool stillScreen)
 
   if (object->type == OT_Player)
   {
- //   Canvas_PrintF(0, 0, &FONT_KAGESANS, 3, "Hit State = %i", object->hitState);
+ // Canvas_PrintF(0,  50, &FONT_KAGESANS, 3, "%i %i   %i %i", object->velocityX, object->accelerationX, object->velocityY, object->velocityY);
 
 //     Canvas_PrintF(0, 0, &FONT_KAGESANS, 3, "%i %i S %i T %i F %i E %i Cr %i Bl %i Ht %i", object->x / 100, object->y / 100, object->moveState, object->frameTicks, object->frameCurrent, !!object->bFrameAnimationEnded, object->bIsCrouched, object->bIsBlocking, object->bIsHitting);
   }
 }
 
-static void Object_PreTick(Object* object)
+void Object_PreTick(Object* object)
 {
   object->nextDrawId = 0;
 
@@ -1090,23 +1166,23 @@ static void Object_PreTick(Object* object)
   }
 }
 
-static void Object_SetPosition(Object* object, i32 x, u16 y)
+void Object_SetPosition(Object* object, i32 x, u16 y)
 {
   object->x = x;
   object->y = y;
 }
 
-static void Object_ModPosition(Object* object)
+void Object_ModPosition(Object* object)
 {
   object->x -= (320 * 100);
 }
 
-static void Object_SetMoveDelta(Object* object, u8 moveVector)
+void Object_SetMoveDelta(Object* object, u8 moveVector)
 {
   object->moveFlags = moveVector;
 }
 
-static void Object_SetMoveAction(Object* object, u8 moveAction)
+void Object_SetMoveAction(Object* object, u8 moveAction)
 {
   bool wasHitting = object->bIsHitting;
 
@@ -1134,7 +1210,7 @@ static void Object_SetMoveAction(Object* object, u8 moveAction)
 
 }
 
-static void Object_Draw(Object* object, i32 xOffset)
+void Object_Draw(Object* object, i32 xOffset)
 {
   
   int x = 0;
@@ -1174,36 +1250,38 @@ static void Object_Draw(Object* object, i32 xOffset)
     Canvas_PrintF(x + 1, y + 1, &FONT_KAGESANS, 5, "RAGE");
     Canvas_PrintF(x, y, &FONT_KAGESANS, 3, "RAGE");
 
+    Canvas_PrintF(x + 1, y + 12 + 1, &FONT_KAGESANS, 5, "LIFE");
+    Canvas_PrintF(x, y + 12, &FONT_KAGESANS, 3, "LIFE");
+
+
     Rect rageRect;
     rageRect.left = x + (8 * 5);
     rageRect.right = rageRect.left + object->rage * 4;
     rageRect.top  = y;
     rageRect.bottom = y+8;
     Canvas_DrawFilledRectangle(9, rageRect);
+
     rageRect.left -= 1;
     rageRect.right = rageRect.left + 65;
     rageRect.top -=1;
     rageRect.bottom += 1;
     Canvas_DrawRectangle(5, rageRect);
 
-    SDL_Rect src, dst;
-    src.x = 32;
-    src.y = 16;
-    src.w = 11;
-    src.h = 10;
+    int m = object->hp * 10;
+    if (object->hp == 6)
+      m = 64;
 
-    dst.x = rageRect.left;
-    dst.y = rageRect.top += 12;
-    dst.w = src.w;
-    dst.h = src.h;
+    rageRect.left = x + (8 * 5);
+    rageRect.right = rageRect.left + m;
+    rageRect.top = y + 12;
+    rageRect.bottom = y + 8 + 12;
+    Canvas_DrawFilledRectangle(17, rageRect);
 
-    for(int i=0;i < object->hp;i++)
-    {
-
-      Canvas_Splat3(&SPRITESHEET, &dst, &src);
-
-      dst.x += src.w;
-    }
+    rageRect.left -= 1;
+    rageRect.right = rageRect.left + 65;
+    rageRect.top -= 1;
+    rageRect.bottom += 1;
+    Canvas_DrawRectangle(5, rageRect);
 
   }
 
@@ -1257,14 +1335,14 @@ static void Object_Draw(Object* object, i32 xOffset)
   #endif
 }
 
-static void Object_Initialise(Object* object, u8 type, u8 section)
+void Object_Initialise(Object* object, u8 type, u8 section)
 {
   SDL_memset(object, 0, sizeof(Object));
   
   object->type = type;
   object->moveSpeedX = 100;
   object->moveSpeedY = 100;
-  object->hp         = 4;
+  object->hp         = (type == OT_Player ? 6 : 3);
   object->aiHitTimer = 4;
   object->bAiStayDistance = 1;
   object->bAiIsHead  = 0;
@@ -1277,7 +1355,7 @@ static void Object_Initialise(Object* object, u8 type, u8 section)
     object->bDirection = 1;
 }
 
-static void Object_Clear(Object* object)
+void Object_Clear(Object* object)
 {
-  object->type = OT_None;
+  SDL_memset(object, 0, sizeof(Object));
 }

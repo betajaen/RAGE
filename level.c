@@ -185,6 +185,9 @@ void Level_Load(const char* t)
 
   }
 
+
+   // sLevel.numSections = 2;
+
 }
 
 static void DrawLevel(Section* section, i32 xOffset)
@@ -216,6 +219,8 @@ static void DrawLevel(Section* section, i32 xOffset)
       Canvas_Splat3(&SPRITESHEET, &dst, &src);
     }
   }
+
+
 }
 
 void Level_Draw(i32 offsetX)
@@ -252,6 +257,30 @@ void Level_Draw(i32 offsetX)
   }
 }
 
+void Level_Splat(u8 level)
+{
+  SDL_Rect src, dst;
+
+  // Background Sky
+  src.x = 416;
+  src.y = 16;
+  src.w = 80;
+  src.h = 128;
+
+  dst.y = 0;
+  dst.w = src.w;
+  dst.h = src.h;
+
+  for (int i = 0; i < (320 / 80); i++)
+  {
+    dst.x = i * 80;
+    Canvas_Splat3(&SPRITESHEET, &dst, &src);
+  }
+
+  Section* sectionLast = &sLevel.sections[level];
+  DrawLevel(sectionLast, 0);
+}
+
 
 void Level_StartSection(u8 sectionIdx)
 {
@@ -268,7 +297,7 @@ void Level_StartSection(u8 sectionIdx)
     {
       case 3:
       {
-        if (sectionIdx == 0)
+        if (sectionIdx == 1)
         {
           if (Objects_FindFirstOf(OT_Player) == 0)
           {
@@ -304,21 +333,22 @@ void Level_StartSection(u8 sectionIdx)
 
 void Level_PrevSection()
 {
-  u8 prev = sLevel.currentSection - 1;
+  i32 prev = sLevel.currentSection - 1;
 
-  if (prev == -1)
-    Level_StartSection(0);
+  if (prev == 0)
+    Level_StartSection(1);
   else
     Level_StartSection(prev);
 }
 
-void Level_NextSection()
+bool Level_NextSection()
 {
   u32 next = sLevel.currentSection + 1;
   if (next == sLevel.numSections)
-    Level_StartSection(0);
-  else
-    Level_StartSection(next);
+    return false;
+  
+  Level_StartSection(next);
+  return true;
 }
 
 void Level_PostNextSection()
